@@ -1,0 +1,1 @@
+{"type":"user","version":"claude-jsonl-v1","uuid":"wf-user","sessionId":"claude-root","agentId":"workflow-agent","timestamp":"2026-08-01T00:00:07.000Z","isSidechain":true,"message":{"role":"user","content":"workflow step"}}

@@ -1,0 +1,8 @@
+# Replace or extend this list as the maintainer team grows.
+* @chivier
+
+/packages/schema/ @chivier
+/packages/db/ @chivier
+/packages/intent-reducer/ @chivier
+/docs/security.md @chivier
+/.github/ @chivier

@@ -1,0 +1,6 @@
+{
+  "agentType": "general-purpose",
+  "description": "Child task",
+  "toolUseId": "toolu-child-1",
+  "spawnDepth": 1
+}

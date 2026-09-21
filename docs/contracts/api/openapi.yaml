@@ -1,0 +1,2693 @@
+# Generated from implemented Fastify routes. Do not edit manually.
+openapi: 3.1.0
+info:
+  title: IntentTrace API
+  description: Implemented local IntentTrace MVP routes; planned APIs are not exposed.
+  version: 0.0.0
+components:
+  schemas: {}
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Process liveness
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    enum:
+                      - api
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                  gate:
+                    type: number
+                    enum:
+                      - 5
+                required:
+                  - service
+                  - status
+                  - gate
+                additionalProperties: false
+  /metrics:
+    get:
+      operationId: getMetrics
+      summary: Minimal Prometheus process metrics
+      responses:
+        "200":
+          description: Default Response
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: PostgreSQL readiness
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    enum:
+                      - api
+                  status:
+                    type: string
+                    enum:
+                      - ready
+                      - degraded
+                  dependencies:
+                    type: object
+                    properties:
+                      postgres:
+                        type: string
+                    required:
+                      - postgres
+                    additionalProperties: false
+                required:
+                  - service
+                  - status
+                  - dependencies
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    enum:
+                      - api
+                  status:
+                    type: string
+                    enum:
+                      - ready
+                      - degraded
+                  dependencies:
+                    type: object
+                    properties:
+                      postgres:
+                        type: string
+                    required:
+                      - postgres
+                    additionalProperties: false
+                required:
+                  - service
+                  - status
+                  - dependencies
+                additionalProperties: false
+  /version:
+    get:
+      operationId: getVersion
+      summary: Build and schema version
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    enum:
+                      - api
+                  version:
+                    type: string
+                  gitCommit:
+                    type: string
+                  schemaVersion:
+                    type: string
+                    enum:
+                      - 1.0.0
+                required:
+                  - service
+                  - version
+                  - gitCommit
+                  - schemaVersion
+                additionalProperties: false
+  /api/v1/events:
+    post:
+      operationId: ingestRawEvent
+      summary: Append one normalized raw trace fact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                schemaVersion:
+                  type: string
+                  enum:
+                    - 1.0.0
+                workspaceId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                projectId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                traceId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                source:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                        - jsonl
+                        - otlp
+                        - codex
+                        - claude
+                        - opencode
+                        - omp
+                        - grok
+                        - pi
+                        - custom
+                    formatVersion:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                    adapterVersion:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                    sourceInstanceId:
+                      type: string
+                      pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                    sourceEventId:
+                      type: string
+                      pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                  required:
+                    - kind
+                    - formatVersion
+                    - adapterVersion
+                    - sourceInstanceId
+                    - sourceEventId
+                  additionalProperties: false
+                occurredAt:
+                  type: string
+                  format: date-time
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                kind:
+                  type: string
+                  enum:
+                    - user_message
+                    - assistant_message
+                    - agent_start
+                    - agent_end
+                    - agent_handoff
+                    - span_start
+                    - span_end
+                    - model_call
+                    - tool_call
+                    - tool_result
+                    - file_read
+                    - file_write
+                    - shell_command
+                    - test_run
+                    - artifact
+                    - error
+                    - log
+                    - correction
+                    - trace_complete
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 240
+                status:
+                  type: string
+                  enum:
+                    - unset
+                    - ok
+                    - error
+                subjectId:
+                  type: string
+                  pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                causationEventId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                agentId:
+                  type: string
+                  pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                spanId:
+                  type: string
+                  pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                parentSpanId:
+                  type: string
+                  pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                payloadRef:
+                  type: object
+                  properties:
+                    artifactId:
+                      type: string
+                      format: uuid
+                      pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    sha256:
+                      type: string
+                      pattern: ^[a-f0-9]{64}$
+                    byteLength:
+                      type: integer
+                      minimum: 0
+                      maximum: 9007199254740991
+                  required:
+                    - artifactId
+                    - sha256
+                    - byteLength
+                  additionalProperties: false
+                artifactRefs:
+                  maxItems: 64
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                attributes:
+                  type: object
+                  propertyNames:
+                    type: string
+                    maxLength: 128
+                  additionalProperties: {}
+                causationSourceEventId:
+                  type: string
+                  pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                workspaceName:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                projectName:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                traceTitle:
+                  type: string
+                  minLength: 1
+                  maxLength: 240
+                payload: {}
+              required:
+                - schemaVersion
+                - workspaceId
+                - projectId
+                - traceId
+                - source
+                - occurredAt
+                - kind
+                - name
+                - status
+                - artifactRefs
+                - attributes
+              additionalProperties: false
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: object
+                    properties:
+                      schemaVersion:
+                        type: string
+                        enum:
+                          - 1.0.0
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      workspaceId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      projectId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      traceId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      source:
+                        type: object
+                        properties:
+                          kind:
+                            type: string
+                            enum:
+                              - jsonl
+                              - otlp
+                              - codex
+                              - claude
+                              - opencode
+                              - omp
+                              - grok
+                              - pi
+                              - custom
+                          formatVersion:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          adapterVersion:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          sourceInstanceId:
+                            type: string
+                            pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                          sourceEventId:
+                            type: string
+                            pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        required:
+                          - kind
+                          - formatVersion
+                          - adapterVersion
+                          - sourceInstanceId
+                          - sourceEventId
+                        additionalProperties: false
+                      ingestSeq:
+                        type: string
+                        pattern: ^[1-9][0-9]*$
+                      occurredAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      ingestedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      kind:
+                        type: string
+                        enum:
+                          - user_message
+                          - assistant_message
+                          - agent_start
+                          - agent_end
+                          - agent_handoff
+                          - span_start
+                          - span_end
+                          - model_call
+                          - tool_call
+                          - tool_result
+                          - file_read
+                          - file_write
+                          - shell_command
+                          - test_run
+                          - artifact
+                          - error
+                          - log
+                          - correction
+                          - trace_complete
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 240
+                      status:
+                        type: string
+                        enum:
+                          - unset
+                          - ok
+                          - error
+                      subjectId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      causationEventId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      agentId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      spanId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      parentSpanId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      payloadRef:
+                        type: object
+                        properties:
+                          artifactId:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          sha256:
+                            type: string
+                            pattern: ^[a-f0-9]{64}$
+                          byteLength:
+                            type: integer
+                            minimum: 0
+                            maximum: 9007199254740991
+                        required:
+                          - artifactId
+                          - sha256
+                          - byteLength
+                        additionalProperties: false
+                      artifactRefs:
+                        maxItems: 64
+                        type: array
+                        items:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      attributes:
+                        type: object
+                        propertyNames:
+                          type: string
+                          maxLength: 128
+                        additionalProperties: {}
+                    required:
+                      - schemaVersion
+                      - id
+                      - workspaceId
+                      - projectId
+                      - traceId
+                      - source
+                      - ingestSeq
+                      - occurredAt
+                      - ingestedAt
+                      - kind
+                      - name
+                      - status
+                      - artifactRefs
+                      - attributes
+                    additionalProperties: false
+                  duplicate:
+                    type: boolean
+                  traceStale:
+                    type: boolean
+                  warnings:
+                    maxItems: 64
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        sourceEventId:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      required:
+                        - code
+                      additionalProperties: false
+                required:
+                  - event
+                  - duplicate
+                  - traceStale
+                  - warnings
+                additionalProperties: false
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event:
+                    type: object
+                    properties:
+                      schemaVersion:
+                        type: string
+                        enum:
+                          - 1.0.0
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      workspaceId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      projectId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      traceId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      source:
+                        type: object
+                        properties:
+                          kind:
+                            type: string
+                            enum:
+                              - jsonl
+                              - otlp
+                              - codex
+                              - claude
+                              - opencode
+                              - omp
+                              - grok
+                              - pi
+                              - custom
+                          formatVersion:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          adapterVersion:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          sourceInstanceId:
+                            type: string
+                            pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                          sourceEventId:
+                            type: string
+                            pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        required:
+                          - kind
+                          - formatVersion
+                          - adapterVersion
+                          - sourceInstanceId
+                          - sourceEventId
+                        additionalProperties: false
+                      ingestSeq:
+                        type: string
+                        pattern: ^[1-9][0-9]*$
+                      occurredAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      ingestedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      kind:
+                        type: string
+                        enum:
+                          - user_message
+                          - assistant_message
+                          - agent_start
+                          - agent_end
+                          - agent_handoff
+                          - span_start
+                          - span_end
+                          - model_call
+                          - tool_call
+                          - tool_result
+                          - file_read
+                          - file_write
+                          - shell_command
+                          - test_run
+                          - artifact
+                          - error
+                          - log
+                          - correction
+                          - trace_complete
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 240
+                      status:
+                        type: string
+                        enum:
+                          - unset
+                          - ok
+                          - error
+                      subjectId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      causationEventId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      agentId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      spanId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      parentSpanId:
+                        type: string
+                        pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      payloadRef:
+                        type: object
+                        properties:
+                          artifactId:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          sha256:
+                            type: string
+                            pattern: ^[a-f0-9]{64}$
+                          byteLength:
+                            type: integer
+                            minimum: 0
+                            maximum: 9007199254740991
+                        required:
+                          - artifactId
+                          - sha256
+                          - byteLength
+                        additionalProperties: false
+                      artifactRefs:
+                        maxItems: 64
+                        type: array
+                        items:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      attributes:
+                        type: object
+                        propertyNames:
+                          type: string
+                          maxLength: 128
+                        additionalProperties: {}
+                    required:
+                      - schemaVersion
+                      - id
+                      - workspaceId
+                      - projectId
+                      - traceId
+                      - source
+                      - ingestSeq
+                      - occurredAt
+                      - ingestedAt
+                      - kind
+                      - name
+                      - status
+                      - artifactRefs
+                      - attributes
+                    additionalProperties: false
+                  duplicate:
+                    type: boolean
+                  traceStale:
+                    type: boolean
+                  warnings:
+                    maxItems: 64
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        sourceEventId:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                      required:
+                        - code
+                      additionalProperties: false
+                required:
+                  - event
+                  - duplicate
+                  - traceStale
+                  - warnings
+                additionalProperties: false
+  /v1/traces:
+    post:
+      operationId: exportOtlpTraces
+      summary: OTLP/HTTP JSON trace receiver
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              propertyNames:
+                type: string
+              additionalProperties: {}
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  partialSuccess:
+                    type: object
+                    properties:
+                      rejectedSpans:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      errorMessage:
+                        type: string
+                    required:
+                      - rejectedSpans
+                      - errorMessage
+                    additionalProperties: false
+                required:
+                  - partialSuccess
+                additionalProperties: false
+  /api/v1/imports/candidates:
+    post:
+      operationId: inspectImportCandidates
+      summary: Inspect candidate metadata or application/vnd.intenttrace.session-bundle
+      responses:
+        "200":
+          description: Candidate inspection
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  protocolVersion:
+                    type: number
+                    const: 2
+                  candidates:
+                    maxItems: 50
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        clientRef:
+                          type: string
+                          minLength: 1
+                          maxLength: 64
+                        candidateId:
+                          type: string
+                          pattern: ^[a-f0-9]{24}$
+                        partRefs:
+                          minItems: 1
+                          maxItems: 5000
+                          type: array
+                          items:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                        source:
+                          anyOf:
+                            - type: string
+                              enum:
+                                - jsonl
+                                - otlp
+                                - codex
+                                - claude
+                                - opencode
+                                - omp
+                                - grok
+                            - type: "null"
+                        title:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 240
+                            - type: "null"
+                        projectHint:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 120
+                            - type: "null"
+                        firstPromptPreview:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 160
+                            - type: "null"
+                        lastPromptPreview:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 160
+                            - type: "null"
+                        partialHead:
+                          type: boolean
+                        traceId:
+                          anyOf:
+                            - type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            - type: "null"
+                        imported:
+                          type: boolean
+                        importedEventCount:
+                          anyOf:
+                            - type: string
+                              pattern: ^(?:0|[1-9][0-9]*)$
+                            - type: "null"
+                        failureCode:
+                          anyOf:
+                            - type: string
+                              enum:
+                                - preflight_failed
+                                - unsupported_version
+                                - no_visible_events
+                                - stale_session
+                                - file_too_large
+                                - unknown_source_format
+                            - type: "null"
+                        failureMessage:
+                          anyOf:
+                            - type: string
+                              minLength: 1
+                              maxLength: 500
+                            - type: "null"
+                      required:
+                        - clientRef
+                        - candidateId
+                        - partRefs
+                        - source
+                        - title
+                        - projectHint
+                        - firstPromptPreview
+                        - lastPromptPreview
+                        - partialHead
+                        - traceId
+                        - imported
+                        - importedEventCount
+                        - failureCode
+                        - failureMessage
+                      additionalProperties: false
+                  alreadyImportedCount:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - protocolVersion
+                  - candidates
+                  - alreadyImportedCount
+                additionalProperties: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                protocolVersion:
+                  type: number
+                  const: 2
+                includePreviews:
+                  type: boolean
+                parts:
+                  minItems: 1
+                  maxItems: 5000
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      clientRef:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      path:
+                        type: string
+                        minLength: 1
+                        maxLength: 1024
+                      byteLength:
+                        type: integer
+                        minimum: 0
+                        maximum: 9007199254740991
+                      modifiedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      headBase64:
+                        type: string
+                      complete:
+                        type: boolean
+                    required:
+                      - clientRef
+                      - path
+                      - byteLength
+                      - modifiedAt
+                      - complete
+                    additionalProperties: false
+              required:
+                - protocolVersion
+                - includePreviews
+                - parts
+              additionalProperties: false
+          application/vnd.intenttrace.session-bundle:
+            schema: &a1
+              type: string
+              contentMediaType: application/vnd.intenttrace.session-bundle
+              description: ITB1 framed session bundle bytes
+  /api/v1/imports/sessions:
+    post:
+      operationId: importUploadedSession
+      summary: Import selected logical traces from
+        application/vnd.intenttrace.session-bundle
+      responses:
+        "200":
+          description: Batch import outcome
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  protocolVersion:
+                    type: number
+                    const: 2
+                  level:
+                    type: string
+                    const: result
+                  command:
+                    type: string
+                    const: upload
+                  results:
+                    minItems: 1
+                    maxItems: 50
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        candidateId:
+                          type: string
+                          pattern: ^[a-f0-9]{24}$
+                        sessionId:
+                          type: string
+                          pattern: ^[a-f0-9]{24}$
+                        traceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        inserted:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        duplicates:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        warnings:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                      required:
+                        - candidateId
+                        - sessionId
+                        - traceId
+                        - inserted
+                        - duplicates
+                        - warnings
+                      additionalProperties: false
+                required:
+                  - protocolVersion
+                  - level
+                  - command
+                  - results
+                additionalProperties: false
+      requestBody:
+        required: true
+        content:
+          application/vnd.intenttrace.session-bundle:
+            schema: *a1
+  /api/v1/traces:
+    get:
+      operationId: listTraces
+      summary: List local traces
+      parameters:
+        - schema:
+            default: 50
+            type: integer
+            minimum: 1
+            maximum: 200
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  traces:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        projectId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        title:
+                          type: string
+                          minLength: 1
+                          maxLength: 240
+                        status:
+                          type: string
+                          enum:
+                            - active
+                            - completed
+                            - stale
+                            - failed
+                        eventCount:
+                          type: string
+                          pattern: ^(?:0|[1-9][0-9]*)$
+                        latestIngestSeq:
+                          type: string
+                          pattern: ^(?:0|[1-9][0-9]*)$
+                        latestRevisionId:
+                          anyOf:
+                            - type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            - type: "null"
+                        createdAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        updatedAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      required:
+                        - id
+                        - projectId
+                        - title
+                        - status
+                        - eventCount
+                        - latestIngestSeq
+                        - latestRevisionId
+                        - createdAt
+                        - updatedAt
+                      additionalProperties: false
+                  nextCursor:
+                    anyOf:
+                      - type: string
+                      - type: "null"
+                required:
+                  - traces
+                  - nextCursor
+                additionalProperties: false
+  /api/v1/traces/{traceId}/nodes/{nodeId}:
+    patch:
+      operationId: editSemanticNode
+      summary: Create a human semantic revision and optionally pin a node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                baseRevisionId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                title:
+                  type: string
+                  minLength: 3
+                  maxLength: 80
+                status:
+                  type: string
+                  enum:
+                    - proposed
+                    - active
+                    - blocked
+                    - completed
+                    - abandoned
+                    - superseded
+                pinned:
+                  type: boolean
+                feedback:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - baseRevisionId
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: nodeId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revision:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      traceId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      parentRevisionId:
+                        anyOf:
+                          - type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          - type: "null"
+                      branchKind:
+                        type: string
+                        enum:
+                          - live
+                          - final
+                          - human
+                          - alternate_model
+                      eventWatermark:
+                        type: string
+                        pattern: ^(?:0|[1-9][0-9]*)$
+                      createdAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      sourceJobId:
+                        anyOf:
+                          - type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          - type: "null"
+                      stale:
+                        default: false
+                        type: boolean
+                    required:
+                      - id
+                      - traceId
+                      - parentRevisionId
+                      - branchKind
+                      - eventWatermark
+                      - createdAt
+                      - sourceJobId
+                      - stale
+                    additionalProperties: false
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        logicalNodeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        traceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        kind:
+                          type: string
+                          enum:
+                            - request
+                            - goal
+                            - work
+                            - decision
+                            - issue
+                            - handoff
+                            - result
+                        status:
+                          type: string
+                          enum:
+                            - proposed
+                            - active
+                            - blocked
+                            - completed
+                            - abandoned
+                            - superseded
+                        title:
+                          type: string
+                          minLength: 3
+                          maxLength: 80
+                        claims:
+                          minItems: 1
+                          maxItems: 3
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              kind:
+                                type: string
+                                enum:
+                                  - intent
+                                  - action
+                                  - outcome
+                              text:
+                                type: string
+                                minLength: 1
+                                maxLength: 480
+                              provenance:
+                                type: string
+                                enum:
+                                  - stated
+                                  - inferred
+                                  - mixed
+                              evidenceEventIds:
+                                minItems: 1
+                                maxItems: 64
+                                type: array
+                                items:
+                                  type: string
+                                  format: uuid
+                                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              confidence:
+                                type: string
+                                enum:
+                                  - high
+                                  - medium
+                                  - low
+                            required:
+                              - kind
+                              - text
+                              - provenance
+                              - evidenceEventIds
+                              - confidence
+                            additionalProperties: false
+                        primaryParentId:
+                          anyOf:
+                            - type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            - type: "null"
+                        primaryAgentId:
+                          anyOf:
+                            - type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                            - type: "null"
+                        participantAgentIds:
+                          maxItems: 32
+                          type: array
+                          items:
+                            type: string
+                            pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        artifactIds:
+                          maxItems: 64
+                          type: array
+                          items:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        pinnedByHuman:
+                          type: boolean
+                        startedAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        endedAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        layout:
+                          default: null
+                          anyOf:
+                            - type: object
+                              properties:
+                                x:
+                                  type: number
+                                y:
+                                  type: number
+                              required:
+                                - x
+                                - y
+                              additionalProperties: false
+                            - type: "null"
+                      required:
+                        - id
+                        - logicalNodeId
+                        - traceId
+                        - kind
+                        - status
+                        - title
+                        - claims
+                        - primaryParentId
+                        - primaryAgentId
+                        - participantAgentIds
+                        - artifactIds
+                        - pinnedByHuman
+                        - startedAt
+                        - endedAt
+                        - layout
+                      additionalProperties: false
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        logicalEdgeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        traceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        sourceNodeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        targetNodeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        kind:
+                          type: string
+                          enum:
+                            - decomposes_to
+                            - attempts
+                            - depends_on
+                            - supports
+                            - blocks
+                            - resolved_by
+                            - hands_off_to
+                            - revises
+                            - produces
+                            - supersedes
+                        retired:
+                          type: boolean
+                        evidenceEventIds:
+                          minItems: 1
+                          maxItems: 64
+                          type: array
+                          items:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        provenance:
+                          type: string
+                          enum:
+                            - stated
+                            - inferred
+                            - mixed
+                      required:
+                        - id
+                        - logicalEdgeId
+                        - traceId
+                        - sourceNodeId
+                        - targetNodeId
+                        - kind
+                        - retired
+                        - evidenceEventIds
+                        - provenance
+                      additionalProperties: false
+                required:
+                  - revision
+                  - nodes
+                  - edges
+                additionalProperties: false
+  /api/v1/traces/{traceId}:
+    delete:
+      operationId: deleteTrace
+      summary: Permanently delete one local trace after explicit ID confirmation
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: query
+          name: confirm
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "204":
+          description: Default Response
+    get:
+      operationId: getTrace
+      summary: Get trace metadata
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  projectId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 240
+                  status:
+                    type: string
+                    enum:
+                      - active
+                      - completed
+                      - stale
+                      - failed
+                  eventCount:
+                    type: string
+                    pattern: ^(?:0|[1-9][0-9]*)$
+                  latestIngestSeq:
+                    type: string
+                    pattern: ^(?:0|[1-9][0-9]*)$
+                  latestRevisionId:
+                    anyOf:
+                      - type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      - type: "null"
+                  createdAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  updatedAt:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - id
+                  - projectId
+                  - title
+                  - status
+                  - eventCount
+                  - latestIngestSeq
+                  - latestRevisionId
+                  - createdAt
+                  - updatedAt
+                additionalProperties: false
+  /api/v1/traces/{traceId}/events:
+    get:
+      operationId: listRawEvents
+      summary: Page append-only raw events by ingest sequence
+      parameters:
+        - schema:
+            default: 0
+            type: integer
+            minimum: 0
+            maximum: 9007199254740991
+          in: query
+          name: after
+          required: false
+        - schema:
+            default: 200
+            type: integer
+            minimum: 1
+            maximum: 1000
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        schemaVersion:
+                          type: string
+                          enum:
+                            - 1.0.0
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        workspaceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        projectId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        traceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        source:
+                          type: object
+                          properties:
+                            kind:
+                              type: string
+                              enum:
+                                - jsonl
+                                - otlp
+                                - codex
+                                - claude
+                                - opencode
+                                - omp
+                                - grok
+                                - pi
+                                - custom
+                            formatVersion:
+                              type: string
+                              minLength: 1
+                              maxLength: 64
+                            adapterVersion:
+                              type: string
+                              minLength: 1
+                              maxLength: 64
+                            sourceInstanceId:
+                              type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                            sourceEventId:
+                              type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                          required:
+                            - kind
+                            - formatVersion
+                            - adapterVersion
+                            - sourceInstanceId
+                            - sourceEventId
+                          additionalProperties: false
+                        ingestSeq:
+                          type: string
+                          pattern: ^[1-9][0-9]*$
+                        occurredAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        ingestedAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        kind:
+                          type: string
+                          enum:
+                            - user_message
+                            - assistant_message
+                            - agent_start
+                            - agent_end
+                            - agent_handoff
+                            - span_start
+                            - span_end
+                            - model_call
+                            - tool_call
+                            - tool_result
+                            - file_read
+                            - file_write
+                            - shell_command
+                            - test_run
+                            - artifact
+                            - error
+                            - log
+                            - correction
+                            - trace_complete
+                        name:
+                          type: string
+                          minLength: 1
+                          maxLength: 240
+                        status:
+                          type: string
+                          enum:
+                            - unset
+                            - ok
+                            - error
+                        subjectId:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        causationEventId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        agentId:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        spanId:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        parentSpanId:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        payloadRef:
+                          type: object
+                          properties:
+                            artifactId:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            sha256:
+                              type: string
+                              pattern: ^[a-f0-9]{64}$
+                            byteLength:
+                              type: integer
+                              minimum: 0
+                              maximum: 9007199254740991
+                          required:
+                            - artifactId
+                            - sha256
+                            - byteLength
+                          additionalProperties: false
+                        artifactRefs:
+                          maxItems: 64
+                          type: array
+                          items:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        attributes:
+                          type: object
+                          propertyNames:
+                            type: string
+                            maxLength: 128
+                          additionalProperties: {}
+                      required:
+                        - schemaVersion
+                        - id
+                        - workspaceId
+                        - projectId
+                        - traceId
+                        - source
+                        - ingestSeq
+                        - occurredAt
+                        - ingestedAt
+                        - kind
+                        - name
+                        - status
+                        - artifactRefs
+                        - attributes
+                      additionalProperties: false
+                  nextCursor:
+                    anyOf:
+                      - type: string
+                        pattern: ^[1-9][0-9]*$
+                      - type: "null"
+                required:
+                  - events
+                  - nextCursor
+                additionalProperties: false
+  /api/v1/traces/{traceId}/snapshot:
+    get:
+      operationId: getTraceSnapshot
+      summary: Get raw trace snapshot at the current watermark
+      parameters:
+        - schema:
+            default: 0
+            type: integer
+            minimum: 0
+            maximum: 9007199254740991
+          in: query
+          name: after
+          required: false
+        - schema:
+            default: 200
+            type: integer
+            minimum: 1
+            maximum: 1000
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trace:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      projectId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      title:
+                        type: string
+                        minLength: 1
+                        maxLength: 240
+                      status:
+                        type: string
+                        enum:
+                          - active
+                          - completed
+                          - stale
+                          - failed
+                      eventCount:
+                        type: string
+                        pattern: ^(?:0|[1-9][0-9]*)$
+                      latestIngestSeq:
+                        type: string
+                        pattern: ^(?:0|[1-9][0-9]*)$
+                      latestRevisionId:
+                        anyOf:
+                          - type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          - type: "null"
+                      createdAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      updatedAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                    required:
+                      - id
+                      - projectId
+                      - title
+                      - status
+                      - eventCount
+                      - latestIngestSeq
+                      - latestRevisionId
+                      - createdAt
+                      - updatedAt
+                    additionalProperties: false
+                  raw:
+                    type: object
+                    properties:
+                      events:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            schemaVersion:
+                              type: string
+                              enum:
+                                - 1.0.0
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            workspaceId:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            projectId:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            traceId:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            source:
+                              type: object
+                              properties:
+                                kind:
+                                  type: string
+                                  enum:
+                                    - jsonl
+                                    - otlp
+                                    - codex
+                                    - claude
+                                    - opencode
+                                    - omp
+                                    - grok
+                                    - pi
+                                    - custom
+                                formatVersion:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 64
+                                adapterVersion:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 64
+                                sourceInstanceId:
+                                  type: string
+                                  pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                                sourceEventId:
+                                  type: string
+                                  pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                              required:
+                                - kind
+                                - formatVersion
+                                - adapterVersion
+                                - sourceInstanceId
+                                - sourceEventId
+                              additionalProperties: false
+                            ingestSeq:
+                              type: string
+                              pattern: ^[1-9][0-9]*$
+                            occurredAt:
+                              type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            ingestedAt:
+                              type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            kind:
+                              type: string
+                              enum:
+                                - user_message
+                                - assistant_message
+                                - agent_start
+                                - agent_end
+                                - agent_handoff
+                                - span_start
+                                - span_end
+                                - model_call
+                                - tool_call
+                                - tool_result
+                                - file_read
+                                - file_write
+                                - shell_command
+                                - test_run
+                                - artifact
+                                - error
+                                - log
+                                - correction
+                                - trace_complete
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 240
+                            status:
+                              type: string
+                              enum:
+                                - unset
+                                - ok
+                                - error
+                            subjectId:
+                              type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                            causationEventId:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            agentId:
+                              type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                            spanId:
+                              type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                            parentSpanId:
+                              type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                            payloadRef:
+                              type: object
+                              properties:
+                                artifactId:
+                                  type: string
+                                  format: uuid
+                                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                sha256:
+                                  type: string
+                                  pattern: ^[a-f0-9]{64}$
+                                byteLength:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 9007199254740991
+                              required:
+                                - artifactId
+                                - sha256
+                                - byteLength
+                              additionalProperties: false
+                            artifactRefs:
+                              maxItems: 64
+                              type: array
+                              items:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            attributes:
+                              type: object
+                              propertyNames:
+                                type: string
+                                maxLength: 128
+                              additionalProperties: {}
+                          required:
+                            - schemaVersion
+                            - id
+                            - workspaceId
+                            - projectId
+                            - traceId
+                            - source
+                            - ingestSeq
+                            - occurredAt
+                            - ingestedAt
+                            - kind
+                            - name
+                            - status
+                            - artifactRefs
+                            - attributes
+                          additionalProperties: false
+                      nextCursor:
+                        anyOf:
+                          - type: string
+                            pattern: ^[1-9][0-9]*$
+                          - type: "null"
+                    required:
+                      - events
+                      - nextCursor
+                    additionalProperties: false
+                  agents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        agentId:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        displayName:
+                          type: string
+                          minLength: 1
+                          maxLength: 120
+                        eventIds:
+                          type: array
+                          items:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        startedAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        endedAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        errorCount:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                      required:
+                        - agentId
+                        - displayName
+                        - eventIds
+                        - startedAt
+                        - endedAt
+                        - errorCount
+                      additionalProperties: false
+                  revision:
+                    anyOf:
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          traceId:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          parentRevisionId:
+                            anyOf:
+                              - type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              - type: "null"
+                          branchKind:
+                            type: string
+                            enum:
+                              - live
+                              - final
+                              - human
+                              - alternate_model
+                          eventWatermark:
+                            type: string
+                            pattern: ^(?:0|[1-9][0-9]*)$
+                          createdAt:
+                            type: string
+                            format: date-time
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                          sourceJobId:
+                            anyOf:
+                              - type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              - type: "null"
+                          stale:
+                            default: false
+                            type: boolean
+                        required:
+                          - id
+                          - traceId
+                          - parentRevisionId
+                          - branchKind
+                          - eventWatermark
+                          - createdAt
+                          - sourceJobId
+                          - stale
+                        additionalProperties: false
+                      - type: "null"
+                  topology:
+                    type: object
+                    properties:
+                      declared:
+                        type: object
+                        properties:
+                          spawn:
+                            type: string
+                            enum:
+                              - stated
+                              - inferred
+                              - passthrough
+                              - unsupported
+                          join:
+                            type: string
+                            enum:
+                              - stated
+                              - inferred
+                              - passthrough
+                              - unsupported
+                          peerMessages:
+                            type: string
+                            enum:
+                              - stated
+                              - inferred
+                              - passthrough
+                              - unsupported
+                          input:
+                            type: string
+                            enum:
+                              - single-file
+                              - bundle
+                          laneKey:
+                            type: string
+                            minLength: 1
+                            maxLength: 160
+                          limits:
+                            type: array
+                            items:
+                              type: string
+                              minLength: 1
+                              maxLength: 480
+                        required:
+                          - spawn
+                          - join
+                          - peerMessages
+                          - input
+                          - laneKey
+                          - limits
+                        additionalProperties: false
+                      observed:
+                        type: object
+                        properties:
+                          lanes:
+                            type: integer
+                            minimum: 0
+                            maximum: 9007199254740991
+                          lanesWithParent:
+                            type: integer
+                            minimum: 0
+                            maximum: 9007199254740991
+                          spawnEdges:
+                            type: integer
+                            minimum: 0
+                            maximum: 9007199254740991
+                          peerEdges:
+                            type: integer
+                            minimum: 0
+                            maximum: 9007199254740991
+                        required:
+                          - lanes
+                          - lanesWithParent
+                          - spawnEdges
+                          - peerEdges
+                        additionalProperties: false
+                    required:
+                      - declared
+                      - observed
+                    additionalProperties: false
+                required:
+                  - trace
+                  - raw
+                  - agents
+                  - revision
+                  - topology
+                additionalProperties: false
+  /api/v1/traces/{traceId}/graph:
+    get:
+      operationId: getSemanticGraph
+      summary: Get one committed semantic graph revision
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: query
+          name: revisionId
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revision:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      traceId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      parentRevisionId:
+                        anyOf:
+                          - type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          - type: "null"
+                      branchKind:
+                        type: string
+                        enum:
+                          - live
+                          - final
+                          - human
+                          - alternate_model
+                      eventWatermark:
+                        type: string
+                        pattern: ^(?:0|[1-9][0-9]*)$
+                      createdAt:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      sourceJobId:
+                        anyOf:
+                          - type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          - type: "null"
+                      stale:
+                        default: false
+                        type: boolean
+                    required:
+                      - id
+                      - traceId
+                      - parentRevisionId
+                      - branchKind
+                      - eventWatermark
+                      - createdAt
+                      - sourceJobId
+                      - stale
+                    additionalProperties: false
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        logicalNodeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        traceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        kind:
+                          type: string
+                          enum:
+                            - request
+                            - goal
+                            - work
+                            - decision
+                            - issue
+                            - handoff
+                            - result
+                        status:
+                          type: string
+                          enum:
+                            - proposed
+                            - active
+                            - blocked
+                            - completed
+                            - abandoned
+                            - superseded
+                        title:
+                          type: string
+                          minLength: 3
+                          maxLength: 80
+                        claims:
+                          minItems: 1
+                          maxItems: 3
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              kind:
+                                type: string
+                                enum:
+                                  - intent
+                                  - action
+                                  - outcome
+                              text:
+                                type: string
+                                minLength: 1
+                                maxLength: 480
+                              provenance:
+                                type: string
+                                enum:
+                                  - stated
+                                  - inferred
+                                  - mixed
+                              evidenceEventIds:
+                                minItems: 1
+                                maxItems: 64
+                                type: array
+                                items:
+                                  type: string
+                                  format: uuid
+                                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              confidence:
+                                type: string
+                                enum:
+                                  - high
+                                  - medium
+                                  - low
+                            required:
+                              - kind
+                              - text
+                              - provenance
+                              - evidenceEventIds
+                              - confidence
+                            additionalProperties: false
+                        primaryParentId:
+                          anyOf:
+                            - type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            - type: "null"
+                        primaryAgentId:
+                          anyOf:
+                            - type: string
+                              pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                            - type: "null"
+                        participantAgentIds:
+                          maxItems: 32
+                          type: array
+                          items:
+                            type: string
+                            pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        artifactIds:
+                          maxItems: 64
+                          type: array
+                          items:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        pinnedByHuman:
+                          type: boolean
+                        startedAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        endedAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        layout:
+                          default: null
+                          anyOf:
+                            - type: object
+                              properties:
+                                x:
+                                  type: number
+                                y:
+                                  type: number
+                              required:
+                                - x
+                                - y
+                              additionalProperties: false
+                            - type: "null"
+                      required:
+                        - id
+                        - logicalNodeId
+                        - traceId
+                        - kind
+                        - status
+                        - title
+                        - claims
+                        - primaryParentId
+                        - primaryAgentId
+                        - participantAgentIds
+                        - artifactIds
+                        - pinnedByHuman
+                        - startedAt
+                        - endedAt
+                        - layout
+                      additionalProperties: false
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        logicalEdgeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        traceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        sourceNodeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        targetNodeId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        kind:
+                          type: string
+                          enum:
+                            - decomposes_to
+                            - attempts
+                            - depends_on
+                            - supports
+                            - blocks
+                            - resolved_by
+                            - hands_off_to
+                            - revises
+                            - produces
+                            - supersedes
+                        retired:
+                          type: boolean
+                        evidenceEventIds:
+                          minItems: 1
+                          maxItems: 64
+                          type: array
+                          items:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        provenance:
+                          type: string
+                          enum:
+                            - stated
+                            - inferred
+                            - mixed
+                      required:
+                        - id
+                        - logicalEdgeId
+                        - traceId
+                        - sourceNodeId
+                        - targetNodeId
+                        - kind
+                        - retired
+                        - evidenceEventIds
+                        - provenance
+                      additionalProperties: false
+                required:
+                  - revision
+                  - nodes
+                  - edges
+                additionalProperties: false
+  /api/v1/traces/{traceId}/revisions:
+    get:
+      operationId: listSemanticRevisions
+      summary: List committed semantic revisions, newest first
+      parameters:
+        - schema:
+            default: 100
+            type: integer
+            minimum: 1
+            maximum: 500
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revisions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        traceId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        parentRevisionId:
+                          anyOf:
+                            - type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            - type: "null"
+                        branchKind:
+                          type: string
+                          enum:
+                            - live
+                            - final
+                            - human
+                            - alternate_model
+                        eventWatermark:
+                          type: string
+                          pattern: ^(?:0|[1-9][0-9]*)$
+                        createdAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        sourceJobId:
+                          anyOf:
+                            - type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            - type: "null"
+                        stale:
+                          default: false
+                          type: boolean
+                      required:
+                        - id
+                        - traceId
+                        - parentRevisionId
+                        - branchKind
+                        - eventWatermark
+                        - createdAt
+                        - sourceJobId
+                        - stale
+                      additionalProperties: false
+                required:
+                  - revisions
+                additionalProperties: false
+  /api/v1/traces/{traceId}/provider-calls:
+    get:
+      operationId: listProviderCalls
+      summary: Audit summary provider calls and recorded cost fields
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  calls:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        summaryJobId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        provider:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        model:
+                          type: string
+                          minLength: 1
+                          maxLength: 240
+                        status:
+                          type: string
+                          pattern: ^[A-Za-z0-9_.:-]{1,128}$
+                        inputTokens:
+                          anyOf:
+                            - type: string
+                              pattern: ^(?:0|[1-9][0-9]*)$
+                            - type: "null"
+                        outputTokens:
+                          anyOf:
+                            - type: string
+                              pattern: ^(?:0|[1-9][0-9]*)$
+                            - type: "null"
+                        costUsd:
+                          anyOf:
+                            - type: string
+                              pattern: ^\d+(?:\.\d+)?$
+                            - type: "null"
+                        createdAt:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      required:
+                        - id
+                        - summaryJobId
+                        - provider
+                        - model
+                        - status
+                        - inputTokens
+                        - outputTokens
+                        - costUsd
+                        - createdAt
+                      additionalProperties: false
+                required:
+                  - calls
+                additionalProperties: false
+  /api/v1/traces/{traceId}/artifacts/{artifactId}:
+    get:
+      operationId: getArtifactRange
+      summary: Read an evidence artifact byte range
+      parameters:
+        - schema:
+            default: 0
+            type: integer
+            minimum: 0
+            maximum: 9007199254740991
+          in: query
+          name: offset
+          required: false
+        - schema:
+            default: 1048576
+            type: integer
+            minimum: 1
+            maximum: 8388608
+          in: query
+          name: length
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: artifactId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/v1/traces/{traceId}/stream:
+    get:
+      operationId: streamTraceEvents
+      summary: Resume durable trace events with Last-Event-ID or cursor
+      parameters:
+        - schema:
+            type: string
+            pattern: ^[0-9]+$
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: traceId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+servers:
+  - url: http://127.0.0.1:3001
+    description: loopback development

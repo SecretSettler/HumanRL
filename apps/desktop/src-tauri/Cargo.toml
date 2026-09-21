@@ -1,0 +1,24 @@
+[package]
+name = "intenttrace-desktop"
+version = "0.0.0"
+description = "IntentTrace local Docker service launcher"
+authors = ["IntentTrace"]
+edition = "2024"
+license = "AGPL-3.0-only"
+publish = false
+
+[build-dependencies]
+tauri-build = "=2.6.3"
+
+[dependencies]
+flate2 = "=1.1.9"
+serde = { version = "=1.0.229", features = ["derive"] }
+tar = "=0.4.46"
+tauri = "=2.11.5"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

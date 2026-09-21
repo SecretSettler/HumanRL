@@ -1,0 +1,52 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    # @types/node must describe the runtime this project actually targets.
+    # engines pins node >=24 <25 with engine-strict, so a types major would
+    # advertise APIs the runtime does not have. Revisit with the Node 26
+    # upgrade once Node 26 reaches LTS on 2026-10-28.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      production-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /apps/desktop/src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:30"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: docker
+    directory: /infra
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    # A node major here has to move with engines, .node-version, the
+    # check-docs.mjs baseline, images.lock and macos-dmg.yml, so it is a
+    # deliberate upgrade rather than a dependency bump. Revisit once Node 26
+    # reaches LTS on 2026-10-28.
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]

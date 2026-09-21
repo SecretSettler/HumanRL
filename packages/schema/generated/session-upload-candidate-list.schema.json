@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "protocolVersion": {
+      "type": "number",
+      "const": 2
+    },
+    "candidates": {
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "clientRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "candidateId": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{24}$"
+          },
+          "partRefs": {
+            "minItems": 1,
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "jsonl",
+                  "otlp",
+                  "codex",
+                  "claude",
+                  "opencode",
+                  "omp",
+                  "grok"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectHint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "firstPromptPreview": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastPromptPreview": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "partialHead": {
+            "type": "boolean"
+          },
+          "traceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "imported": {
+            "type": "boolean"
+          },
+          "importedEventCount": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9][0-9]*)$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failureCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "preflight_failed",
+                  "unsupported_version",
+                  "no_visible_events",
+                  "stale_session",
+                  "file_too_large",
+                  "unknown_source_format"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failureMessage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "clientRef",
+          "candidateId",
+          "partRefs",
+          "source",
+          "title",
+          "projectHint",
+          "firstPromptPreview",
+          "lastPromptPreview",
+          "partialHead",
+          "traceId",
+          "imported",
+          "importedEventCount",
+          "failureCode",
+          "failureMessage"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "alreadyImportedCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "candidates",
+    "alreadyImportedCount"
+  ],
+  "additionalProperties": false
+}

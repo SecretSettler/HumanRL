@@ -1,0 +1,10 @@
+.next
+.turbo
+.cache
+dist
+node_modules
+.pnpm-store
+pnpm-lock.yaml
+docs/design/source
+docs/design/prototype/intenttrace_ui_prototype.html
+packages/schema/generated

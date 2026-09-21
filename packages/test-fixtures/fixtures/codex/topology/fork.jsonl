@@ -1,0 +1,2 @@
+{"type":"session_meta","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:02.500Z","payload":{"id":"codex-fork","session_id":"codex-root","forked_from_id":"codex-root","parent_thread_id":"codex-root","history_mode":"legacy","multi_agent_version":"v2"}}
+{"type":"response_item","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:01.000Z","payload":{"id":"spawn-item","type":"function_call","name":"spawn_agent","namespace":"collaboration","arguments":"{\"task_name\":\"child\",\"message\":\"[encrypted omitted]\"}","call_id":"call-spawn-1"}}

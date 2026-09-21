@@ -1,0 +1,3 @@
+{"type":"session_meta","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:00.000Z","payload":{"id":"codex-fixture","agent_id":"orchestrator"}}
+{"type":"turn_context","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:01.000Z","payload":{"id":"turn-1","name":"User request"}}
+{"type":"response_item","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:02.000Z","payload":{"id":"item-1","type":"function_call","name":"read_file"}}

@@ -1,0 +1,18 @@
+[
+  {
+    "type": "user",
+    "version": "claude-jsonl-v1",
+    "uuid": "message-1",
+    "sessionId": "claude-fixture",
+    "timestamp": "2026-08-01T00:00:00.000Z",
+    "message": { "role": "user", "content": "Synthetic request" }
+  },
+  {
+    "type": "assistant",
+    "version": "claude-jsonl-v1",
+    "uuid": "message-2",
+    "sessionId": "claude-fixture",
+    "timestamp": "2026-08-01T00:00:01.000Z",
+    "message": { "role": "assistant", "content": "Synthetic response" }
+  }
+]

@@ -1,0 +1,6 @@
+{"type":"session_meta","timestamp":"2026-08-01T00:00:00.000Z","payload":{"id":"codex-privacy","base_instructions":{"text":"must-not-persist"}}}
+{"type":"response_item","timestamp":"2026-08-01T00:00:01.000Z","payload":{"id":"reasoning-1","type":"reasoning","encrypted_content":"must-not-persist","summary":[{"text":"must-not-persist"}]}}
+{"type":"response_item","timestamp":"2026-08-01T00:00:02.000Z","payload":{"id":"message-1","type":"message","role":"assistant","content":[{"type":"output_text","text":"Visible answer"},{"type":"encrypted_content","data":"must-not-persist"}]}}
+{"type":"response_item","timestamp":"2026-08-01T00:00:02.250Z","payload":{"id":"call-1","call_id":"call-1","type":"custom_tool_call","name":"read_file","input":"{\"path\":\"visible.txt\"}"}}
+{"type":"response_item","timestamp":"2026-08-01T00:00:02.500Z","payload":{"call_id":"call-1","type":"custom_tool_call_output","output":[{"type":"text","text":"Visible result"}]}}
+{"type":"world_state","timestamp":"2026-08-01T00:00:03.000Z","payload":{"state":{"instructions":"must-not-persist"}}}

@@ -1,0 +1,26 @@
+{
+  "files.exclude": {
+    "**/.cache": true,
+    "**/.intenttrace": true,
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/*.tsbuildinfo": true,
+    "**/coverage": true,
+    "**/dist": true,
+    "**/node_modules": true,
+    "**/playwright-report": true,
+    "**/test-results": true
+  },
+  "search.exclude": {
+    "**/.cache": true,
+    "**/.intenttrace": true,
+    "**/.next": true,
+    "**/.turbo": true,
+    "**/*.tsbuildinfo": true,
+    "**/coverage": true,
+    "**/dist": true,
+    "**/node_modules": true,
+    "**/playwright-report": true,
+    "**/test-results": true
+  }
+}

@@ -1,0 +1,111 @@
+name: macOS DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      verify_only:
+        description: "Run the bundle preflight without building the DMG"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-dmg-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-dmg:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+
+      # Catches identifier/icon/DMG-geometry/resource mistakes before spending
+      # ~40 minutes on a universal release build.
+      - name: Bundle preflight
+        run: pnpm desktop:check
+
+      # Tauri v2 creates its own temporary keychain from APPLE_CERTIFICATE, so
+      # the credentials are only exported when they are actually present.
+      # Exporting empty strings would make the bundler attempt (and fail)
+      # signing and notarization on an unsigned build.
+      - name: Resolve signing mode
+        id: signing
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No Apple signing secrets configured; producing an UNSIGNED DMG that Gatekeeper will reject."
+          fi
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "notarized=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "notarized=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build universal DMG
+        if: ${{ !inputs.verify_only }}
+        env:
+          APPLE_CERTIFICATE: ${{ steps.signing.outputs.signed == 'true' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ steps.signing.outputs.signed == 'true' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.signed == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ steps.signing.outputs.notarized == 'true' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ steps.signing.outputs.notarized == 'true' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ steps.signing.outputs.notarized == 'true' && secrets.APPLE_TEAM_ID || '' }}
+        run: pnpm --filter @intenttrace/desktop tauri build --target universal-apple-darwin --bundles dmg
+
+      # An unverified DMG is indistinguishable from a broken one until a user
+      # double-clicks it, so assert the signature and staple on the runner.
+      - name: Verify signature and notarization
+        if: ${{ !inputs.verify_only && steps.signing.outputs.signed == 'true' }}
+        run: |
+          set -euo pipefail
+          bundle_dir=apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle
+          app=$(find "$bundle_dir/macos" -maxdepth 1 -name '*.app' -print -quit)
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign --display --requirements - --verbose=4 "$app"
+          spctl --assess --type execute --verbose=4 "$app"
+          if [ "${{ steps.signing.outputs.notarized }}" = "true" ]; then
+            xcrun stapler validate "$app"
+            find "$bundle_dir/dmg" -name '*.dmg' -print0 | xargs -0 -I{} xcrun stapler validate {}
+          fi
+
+      - name: Checksum
+        if: ${{ !inputs.verify_only }}
+        run: |
+          set -euo pipefail
+          cd apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg
+          shasum -a 256 ./*.dmg | tee SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !inputs.verify_only }}
+        with:
+          name: intenttrace-macos-dmg-${{ steps.signing.outputs.signed == 'true' && 'signed' || 'unsigned' }}
+          path: |
+            apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

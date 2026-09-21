@@ -1,0 +1,461 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0d12;
+  --color-panel: #10141b;
+  --color-panel-2: #151a23;
+  --color-panel-3: #1b2230;
+  --color-line: #273142;
+  --color-line-soft: #1d2532;
+  --color-ink: #f2f5f8;
+  --color-muted: #93a0b4;
+  --color-muted-2: #687488;
+  --color-accent: #8b7cf6;
+  --color-accent-2: #59b6ff;
+  --color-cyan: #49d6d0;
+  --color-green: #53d48a;
+  --color-amber: #f1b95b;
+  --color-red: #ff7373;
+  --color-pink: #e58bd8;
+  --radius-panel: 14px;
+  --shadow-panel: 0 18px 60px rgb(0 0 0 / 34%);
+  --shadow-node: 0 12px 30px rgb(0 0 0 / 27%);
+
+  /*
+   * Workbench type scale. Six steps only — every surface picks one of these so
+   * the density stays uniform. Use `micro` for uppercase labels, `meta` for
+   * secondary facts, `body` for readable prose, `title` for headings inside
+   * panels, `metric` for stat values, `lead` for the one primary title.
+   */
+  --text-micro: 10px;
+  --text-micro--line-height: 1.4;
+  --text-meta: 11px;
+  --text-meta--line-height: 1.45;
+  --text-body: 12px;
+  --text-body--line-height: 1.5;
+  --text-title: 13px;
+  --text-title--line-height: 1.4;
+  --text-metric: 15px;
+  --text-metric--line-height: 1.2;
+  --text-lead: 16px;
+  --text-lead--line-height: 1.35;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 35% -20%, rgb(96 86 203 / 16%) 0, transparent 35%),
+    radial-gradient(circle at 85% 20%, rgb(30 125 180 / 10%) 0, transparent 28%), var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  /* Anchor the scale so unstyled elements land on `body`, not the 16px default. */
+  font-size: var(--text-body);
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+a {
+  color: #c7c0ff;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid #85c8ff;
+  outline-offset: 2px;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--color-ink);
+}
+button {
+  border: 1px solid var(--color-line);
+  background: var(--color-panel-3);
+  border-radius: 8px;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ---------------------------------------------------------------- */
+/* Shared primitives (packages/ui badge, button, banner, chip)        */
+/* ---------------------------------------------------------------- */
+.muted {
+  color: var(--color-muted);
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: #121826;
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.status-badge--ok {
+  border-color: color-mix(in srgb, var(--color-green) 55%, transparent);
+  color: var(--color-green);
+}
+.status-badge--warning {
+  border-color: color-mix(in srgb, var(--color-amber) 55%, transparent);
+  color: var(--color-amber);
+}
+.status-badge--blocked {
+  border-color: #b84b61;
+  color: #ff9bad;
+}
+.ui-banner {
+  padding: 14px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: var(--color-muted);
+  font-size: var(--text-meta);
+  background: var(--color-panel);
+}
+.ui-banner--info {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  color: var(--color-ink);
+}
+.ui-banner--warning {
+  border-color: color-mix(in srgb, var(--color-amber) 55%, transparent);
+  color: var(--color-amber);
+}
+.ui-banner--danger {
+  border-color: #b84b61;
+  color: #ffb0bf;
+}
+.ui-banner--success {
+  border-color: color-mix(in srgb, var(--color-green) 55%, transparent);
+  color: var(--color-green);
+}
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 9px;
+  color: var(--color-ink);
+  background: var(--color-panel-3);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+.ui-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+.ui-button--primary {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  color: var(--color-bg);
+  background: var(--color-accent);
+}
+.ui-button--ghost {
+  border-color: transparent;
+  color: var(--color-muted);
+  background: transparent;
+}
+.ui-button--danger {
+  border-color: #b84b61;
+  color: #ffb0bf;
+  background: var(--color-panel);
+}
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-muted);
+  background: #121826;
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.ui-chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-panel-3));
+}
+
+/* ---------------------------------------------------------------- */
+/* Workbench panels not yet migrated to utilities                    */
+/* ---------------------------------------------------------------- */
+.panel-heading,
+.claim header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panel-heading {
+  height: 40px;
+  flex: none;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--color-line-soft);
+}
+.panel-heading h2 {
+  margin: 0;
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.panel-heading span {
+  color: var(--color-muted);
+  font-size: var(--text-micro);
+}
+.graph-panel .react-flow {
+  background: #0c1016;
+}
+.claim {
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: #0d1118;
+}
+.claim header span {
+  color: var(--color-muted);
+  font-size: var(--text-micro);
+}
+.claim p {
+  color: #d7deeb;
+  font-size: var(--text-body);
+}
+.claim button {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.raw-detail {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: #0c1016;
+}
+.raw-detail > header,
+.raw-detail dl,
+.raw-detail dl > div {
+  display: flex;
+  gap: 10px;
+}
+.raw-detail > header {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.raw-detail h3 {
+  margin: 4px 0 10px;
+  font-size: var(--text-title);
+  overflow-wrap: anywhere;
+}
+.raw-detail header > span,
+.raw-detail dt,
+.raw-detail small {
+  color: var(--color-muted);
+  font-size: var(--text-micro);
+}
+.raw-detail dd {
+  font-size: var(--text-meta);
+}
+.raw-detail dl {
+  flex-wrap: wrap;
+  margin: 8px 0 12px;
+}
+.raw-detail dl > div {
+  align-items: baseline;
+}
+.raw-detail dd {
+  margin: 0;
+}
+.raw-detail a {
+  display: inline-block;
+  margin-bottom: 10px;
+}
+.raw-detail pre {
+  max-height: 520px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: #d7deeb;
+  font-size: var(--text-meta);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid #202b3e;
+  border-radius: 8px;
+  background: #05070c;
+}
+.human-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+}
+.human-controls button {
+  padding: 8px;
+}
+.human-controls textarea {
+  min-height: 64px;
+  resize: vertical;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: #0c1016;
+}
+.raw-row {
+  display: grid;
+  grid-template-columns: 58px 116px minmax(240px, 1fr) 132px 96px;
+  width: 100%;
+  gap: 12px;
+  align-items: center;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--color-line-soft);
+  border-radius: 0;
+  font-size: var(--text-meta);
+  text-align: left;
+  background: transparent;
+}
+.raw-row > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.raw-row strong {
+  font-weight: 600;
+}
+.raw-row:hover,
+.raw-row--selected {
+  background: #1a263b;
+}
+.raw-row code,
+.raw-row span,
+.raw-row small,
+.raw-row time {
+  color: var(--color-muted);
+  font-size: var(--text-micro);
+}
+
+/* ---------------------------------------------------------------- */
+/* Responsive workbench                                              */
+/* ---------------------------------------------------------------- */
+@media (max-width: 1279px) {
+  .workbench-sidebar {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .workbench-inspector {
+    position: fixed;
+    z-index: 20;
+    top: 66px;
+    right: 8px;
+    bottom: 8px;
+    width: min(390px, calc(100vw - 48px));
+    box-shadow: 0 24px 80px #000a;
+    transform: translateX(calc(100% + 24px));
+    transition: transform 0.18s ease;
+  }
+  .workbench-inspector--open {
+    transform: translateX(0);
+  }
+  .inspector-toggle {
+    display: inline-flex !important;
+  }
+}
+
+/* The four-column trace list only fits once the shell is wide enough. */
+@media (max-width: 899px) {
+  .trace-row__events,
+  .trace-row__duration {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .trace-row {
+    grid-template-columns: minmax(0, 1fr) 88px 96px 92px;
+  }
+}
+
+@media (max-width: 1023px) {
+  main.page-shell {
+    width: min(100% - 28px, 760px);
+    padding-top: 36px;
+  }
+  .hero {
+    flex-direction: column;
+  }
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+  .card--wide {
+    grid-column: auto;
+  }
+  .workbench-shell {
+    display: block;
+    height: auto;
+    overflow: auto;
+  }
+  .workbench-main {
+    height: auto;
+  }
+  .workbench-inspector {
+    display: none;
+  }
+  .workbench-main::before {
+    content: "有限只读布局：建议使用 ≥1024px 桌面窗口";
+    display: block;
+    padding: 10px 14px;
+    color: var(--color-amber);
+  }
+  .human-controls {
+    display: none;
+  }
+  .raw-row {
+    grid-template-columns: 46px 84px minmax(150px, 1fr);
+  }
+  .raw-row small,
+  .raw-row time {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

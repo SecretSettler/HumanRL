@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IntentTrace Desktop</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, sans-serif;
+        background: #080b12;
+        color: #f5f7fb;
+      }
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        background: radial-gradient(circle at 70% 0, #202b52, #080b12 55%);
+      }
+      main {
+        width: min(620px, calc(100% - 48px));
+        padding: 36px;
+        border: 1px solid #2a3548;
+        border-radius: 20px;
+        background: #111722;
+        box-shadow: 0 28px 80px #0007;
+      }
+      p {
+        color: #a8b3c7;
+        line-height: 1.6;
+      }
+      button {
+        padding: 12px 18px;
+        border: 1px solid #796ee5;
+        border-radius: 10px;
+        color: white;
+        background: #5749d6;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      code {
+        display: block;
+        margin-top: 18px;
+        color: #f0bd62;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p>IntentTrace · macOS local service</p>
+      <h1>启动隔离的本地工作台</h1>
+      <p>
+        需要 Docker Desktop。API 和 PostgreSQL 仅在内部网络中，桌面壳只打开动态分配的 loopback Web
+        端口。
+      </p>
+      <button id="start" type="button">启动 IntentTrace</button>
+      <code id="status" role="status">尚未启动</code>
+    </main>
+    <script>
+      const start = document.querySelector("#start");
+      const status = document.querySelector("#status");
+      start.addEventListener("click", async () => {
+        start.disabled = true;
+        status.textContent = "正在检查 Docker Desktop 并构建服务…首次启动可能需要数分钟。";
+        try {
+          const result = await window.__TAURI__.core.invoke("start_stack");
+          status.textContent = `服务已就绪：${result.url}`;
+          window.location.replace(`${result.url}/traces`);
+        } catch (error) {
+          status.textContent = `启动失败：${String(error)}`;
+          start.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IntentTrace UI Prototype</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0d12;
+    --panel: #10141b;
+    --panel-2: #151a23;
+    --panel-3: #1b2230;
+    --line: #273142;
+    --line-soft: #1d2532;
+    --text: #f2f5f8;
+    --muted: #93a0b4;
+    --muted-2: #687488;
+    --accent: #8b7cf6;
+    --accent-2: #59b6ff;
+    --cyan: #49d6d0;
+    --green: #53d48a;
+    --amber: #f1b95b;
+    --red: #ff7373;
+    --pink: #e58bd8;
+    --shadow: 0 18px 60px rgba(0,0,0,.34);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 35% -20%, rgba(96, 86, 203, .16), transparent 35%),
+      radial-gradient(circle at 85% 20%, rgba(30, 125, 180, .10), transparent 28%),
+      var(--bg);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: .01em;
+  }
+  button, input { font: inherit; }
+  button { color: inherit; }
+  .app { height: 100%; display: grid; grid-template-rows: 58px 1fr; }
+  .topbar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 16px; border-bottom: 1px solid var(--line-soft);
+    background: rgba(10, 13, 18, .88); backdrop-filter: blur(14px);
+    position: relative; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 208px; }
+  .logo {
+    width: 30px; height: 30px; border-radius: 9px;
+    background: conic-gradient(from 210deg, var(--accent), var(--accent-2), var(--cyan), var(--accent));
+    position: relative; box-shadow: 0 0 24px rgba(114, 115, 246, .24);
+  }
+  .logo:after {
+    content:""; position:absolute; inset:6px; border:2px solid #0b0e14; border-radius:50%;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.38);
+  }
+  .brand-name { font-weight: 700; font-size: 15px; }
+  .brand-sub { color: var(--muted-2); font-size: 11px; margin-top: 1px; }
+  .trace-title { min-width: 0; flex: 1; }
+  .trace-title strong { display:block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trace-title span { display:block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .segmented { display:flex; padding:3px; border:1px solid var(--line); background:var(--panel); border-radius:10px; }
+  .segmented button {
+    border:0; background:transparent; color:var(--muted); padding:6px 10px; border-radius:7px; font-size:11px; cursor:pointer;
+  }
+  .segmented button.active { color:#fff; background:var(--panel-3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.04); }
+  .action-btn {
+    display:flex; align-items:center; gap:7px; border:1px solid var(--line); background:var(--panel);
+    border-radius:10px; padding:7px 10px; cursor:pointer; font-size:11px; color:var(--muted);
+  }
+  .action-btn:hover { color:#fff; border-color:#39475d; }
+  .action-btn.primary { color:#fff; border-color:rgba(139,124,246,.45); background:rgba(139,124,246,.13); }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 12px rgba(83,212,138,.8); }
+  .workspace {
+    min-height:0; display:grid; grid-template-columns: 240px minmax(640px, 1fr) 338px;
+  }
+  .sidebar, .inspector { min-height:0; background:rgba(16,20,27,.92); }
+  .sidebar { border-right:1px solid var(--line-soft); display:flex; flex-direction:column; }
+  .inspector { border-left:1px solid var(--line-soft); display:flex; flex-direction:column; }
+  .side-head { padding:14px 14px 10px; border-bottom:1px solid var(--line-soft); }
+  .side-head-row { display:flex; align-items:center; justify-content:space-between; }
+  .eyebrow { color:var(--muted-2); font-size:10px; text-transform:uppercase; letter-spacing:.13em; font-weight:700; }
+  .search {
+    margin-top:10px; height:34px; display:flex; align-items:center; gap:8px; padding:0 10px;
+    border:1px solid var(--line); background:#0d1118; border-radius:9px; color:var(--muted-2); font-size:11px;
+  }
+  .trace-list { padding:8px; overflow:auto; }
+  .trace-item {
+    border:1px solid transparent; border-radius:11px; padding:10px; margin-bottom:5px; cursor:pointer;
+  }
+  .trace-item:hover { background:rgba(255,255,255,.025); }
+  .trace-item.active { background:rgba(139,124,246,.09); border-color:rgba(139,124,246,.25); }
+  .trace-row { display:flex; gap:8px; align-items:flex-start; }
+  .trace-status { width:8px; height:8px; border-radius:50%; margin-top:4px; flex:none; }
+  .trace-status.live { background:var(--green); box-shadow:0 0 10px rgba(83,212,138,.55); }
+  .trace-status.done { background:var(--accent-2); }
+  .trace-status.fail { background:var(--red); }
+  .trace-item h4 { margin:0; font-size:11px; line-height:1.4; font-weight:600; }
+  .trace-item p { margin:5px 0 0; font-size:10px; color:var(--muted-2); line-height:1.4; }
+  .trace-meta { display:flex; gap:7px; margin-top:8px; color:var(--muted-2); font-size:9px; }
+  .sidebar-footer { margin-top:auto; padding:12px; border-top:1px solid var(--line-soft); }
+  .budget-card { padding:10px; border:1px solid var(--line); border-radius:11px; background:#0d1118; }
+  .budget-title { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); }
+  .budget-bar { margin-top:8px; height:5px; border-radius:10px; background:#202838; overflow:hidden; }
+  .budget-bar span { display:block; width:31%; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); }
+  .budget-note { margin-top:7px; color:var(--muted-2); font-size:9px; }
+  .main { min-width:0; min-height:0; display:grid; grid-template-rows: 86px minmax(300px,1fr) 226px; }
+  .summary-strip {
+    display:grid; grid-template-columns:minmax(280px,1fr) repeat(6, minmax(68px,92px)); gap:8px;
+    padding:10px 12px; border-bottom:1px solid var(--line-soft); background:rgba(12,16,22,.7);
+  }
+  .now-card, .metric-card {
+    border:1px solid var(--line); border-radius:11px; background:linear-gradient(180deg,rgba(27,34,48,.78),rgba(16,20,27,.78));
+  }
+  .now-card { padding:10px 12px; min-width:0; position:relative; overflow:hidden; }
+  .now-card:before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); }
+  .now-label { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.12em; }
+  .now-text { margin-top:7px; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .now-sub { margin-top:3px; color:var(--muted-2); font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .metric-card { display:flex; flex-direction:column; justify-content:center; padding:8px 9px; }
+  .metric-label { color:var(--muted-2); font-size:9px; }
+  .metric-value { margin-top:5px; font-size:14px; font-weight:700; }
+  .metric-delta { color:var(--green); font-size:8px; margin-top:2px; }
+  .graph-shell { min-height:0; position:relative; overflow:hidden; background:
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+    #0c1016; background-size:26px 26px; }
+  .graph-toolbar {
+    position:absolute; top:10px; left:12px; right:12px; display:flex; justify-content:space-between; align-items:center; z-index:6; pointer-events:none;
+  }
+  .toolbar-group { display:flex; gap:6px; pointer-events:auto; }
+  .tool-chip {
+    border:1px solid var(--line); background:rgba(16,20,27,.88); color:var(--muted); border-radius:8px; padding:6px 9px; font-size:9px; cursor:pointer; backdrop-filter:blur(8px);
+  }
+  .tool-chip.active { color:#fff; border-color:rgba(139,124,246,.35); background:rgba(139,124,246,.12); }
+  .graph-viewport { position:absolute; inset:0; overflow:auto; }
+  .graph-canvas { position:relative; width:900px; height:990px; margin:0 auto; transform-origin:top center; }
+  .lane-labels { position:absolute; top:52px; left:0; right:0; display:grid; grid-template-columns:repeat(3,1fr); z-index:1; }
+  .lane-label { text-align:center; color:#536076; font-size:9px; text-transform:uppercase; letter-spacing:.13em; }
+  .lane-line { position:absolute; top:77px; bottom:20px; width:1px; background:linear-gradient(var(--line-soft),transparent); opacity:.65; }
+  .lane-line.l1 { left:150px; } .lane-line.l2 { left:450px; } .lane-line.l3 { left:750px; }
+  .graph-svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; z-index:1; }
+  .edge { fill:none; stroke:#3b4658; stroke-width:2; opacity:0; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:7 7; }
+  .edge.visible { opacity:1; animation:drawEdge .7s ease-out both; }
+  .edge.handoff { stroke:var(--pink); stroke-dasharray:3 8; }
+  .edge.issue { stroke:var(--red); }
+  .edge.merge { stroke:var(--cyan); }
+  @keyframes drawEdge { from { stroke-dashoffset:90; opacity:0; } to { stroke-dashoffset:0; opacity:1; } }
+  .pulse-dot { opacity:0; }
+  .pulse-dot.visible { opacity:1; }
+  .semantic-node {
+    position:absolute; width:246px; min-height:98px; z-index:3;
+    border:1px solid #303a4c; border-radius:13px; background:linear-gradient(180deg,rgba(28,35,49,.98),rgba(17,22,31,.98));
+    box-shadow:0 12px 30px rgba(0,0,0,.27); padding:11px 11px 10px;
+    opacity:0; transform:translateY(12px) scale(.97); pointer-events:none;
+    transition:opacity .35s ease, transform .45s cubic-bezier(.2,.75,.2,1), border-color .2s, box-shadow .2s;
+  }
+  .semantic-node.visible { opacity:1; transform:translateY(0) scale(1); pointer-events:auto; cursor:pointer; }
+  .semantic-node.pending { border-style:dashed; filter:saturate(.65); animation:ghostPulse .9s ease-in-out infinite alternate; }
+  .semantic-node.selected { border-color:var(--accent-2); box-shadow:0 0 0 2px rgba(89,182,255,.14), 0 18px 45px rgba(0,0,0,.36); }
+  .semantic-node.active:after {
+    content:""; position:absolute; inset:-1px; border-radius:13px; border:1px solid rgba(139,124,246,.7); animation:activePulse 1.8s ease-out infinite;
+  }
+  .semantic-node.issue { border-color:rgba(255,115,115,.5); }
+  .semantic-node.result { border-color:rgba(83,212,138,.5); box-shadow:0 15px 44px rgba(34,120,74,.11), 0 12px 30px rgba(0,0,0,.27); }
+  @keyframes ghostPulse { from{opacity:.45} to{opacity:.78} }
+  @keyframes activePulse { 0%{opacity:.6;transform:scale(1)} 100%{opacity:0;transform:scale(1.045)} }
+  .node-top { display:flex; align-items:center; gap:8px; }
+  .node-icon {
+    width:25px; height:25px; border-radius:8px; display:grid; place-items:center; font-size:11px; flex:none;
+    background:rgba(139,124,246,.14); color:#c8c1ff; border:1px solid rgba(139,124,246,.22);
+  }
+  .semantic-node.issue .node-icon { background:rgba(255,115,115,.12); color:#ffabab; border-color:rgba(255,115,115,.22); }
+  .semantic-node.result .node-icon { background:rgba(83,212,138,.11); color:#9af0bc; border-color:rgba(83,212,138,.22); }
+  .node-heading { min-width:0; flex:1; }
+  .node-kind { color:var(--muted-2); font-size:8px; text-transform:uppercase; letter-spacing:.12em; }
+  .node-title { margin-top:2px; font-size:11px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .confidence { color:var(--muted-2); font-size:8px; padding:3px 5px; border:1px solid var(--line); border-radius:6px; }
+  .node-summary { margin-top:8px; color:#bbc4d2; font-size:9px; line-height:1.45; height:26px; overflow:hidden; }
+  .node-meta { margin-top:8px; display:flex; gap:6px; align-items:center; color:var(--muted-2); font-size:8px; }
+  .node-meta span { display:inline-flex; align-items:center; gap:3px; }
+  .status-pill { margin-left:auto; padding:3px 5px; border-radius:6px; border:1px solid var(--line); }
+  .status-pill.done { color:#8ce7af; border-color:rgba(83,212,138,.25); background:rgba(83,212,138,.07); }
+  .status-pill.blocked { color:#ffabab; border-color:rgba(255,115,115,.25); background:rgba(255,115,115,.07); }
+  .status-pill.active { color:#c6bfff; border-color:rgba(139,124,246,.25); background:rgba(139,124,246,.07); }
+  .timeline-shell { min-height:0; border-top:1px solid var(--line-soft); background:#0d1117; display:flex; flex-direction:column; }
+  .timeline-head { height:38px; padding:0 12px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line-soft); }
+  .timeline-title { display:flex; gap:8px; align-items:center; font-size:10px; font-weight:600; }
+  .timeline-title span { color:var(--muted-2); font-weight:400; }
+  .timeline-controls { display:flex; gap:5px; }
+  .timeline { min-height:0; flex:1; display:grid; grid-template-columns:112px 1fr; overflow:hidden; }
+  .lane-names { border-right:1px solid var(--line-soft); padding-top:25px; }
+  .lane-name { height:25px; padding:5px 10px; font-size:9px; color:var(--muted); display:flex; align-items:center; gap:7px; }
+  .agent-dot { width:7px; height:7px; border-radius:50%; }
+  .timeline-grid { position:relative; overflow:auto hidden; }
+  .time-axis { position:absolute; top:0; left:0; width:900px; height:25px; border-bottom:1px solid var(--line-soft); }
+  .time-tick { position:absolute; top:8px; font-size:8px; color:var(--muted-2); transform:translateX(-50%); }
+  .time-line { position:absolute; top:25px; bottom:0; width:1px; background:rgba(255,255,255,.04); }
+  .gantt-canvas { position:relative; width:900px; height:150px; margin-top:25px; }
+  .gantt-row { position:absolute; left:0; right:0; height:25px; border-bottom:1px solid rgba(255,255,255,.025); }
+  .bar {
+    position:absolute; height:14px; top:5px; border-radius:5px; opacity:.22; transform:scaleX(.05); transform-origin:left center;
+    transition:transform .4s ease, opacity .35s ease, filter .2s; border:1px solid rgba(255,255,255,.08);
+  }
+  .bar.visible { opacity:.85; transform:scaleX(1); }
+  .bar.highlight { opacity:1; filter:brightness(1.3); box-shadow:0 0 0 2px rgba(255,255,255,.08); }
+  .bar.model { height:10px; top:7px; opacity:.6; }
+  .bar.error { outline:1px solid rgba(255,115,115,.9); }
+  .playhead { position:absolute; top:0; bottom:0; width:1px; background:var(--accent-2); z-index:4; box-shadow:0 0 10px rgba(89,182,255,.8); left:0; transition:left .6s linear; }
+  .playhead:before { content:""; position:absolute; top:0; left:-4px; width:9px; height:9px; border-radius:50%; background:var(--accent-2); }
+  .inspector-head { padding:14px; border-bottom:1px solid var(--line-soft); }
+  .inspector-title-row { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .inspector h2 { margin:5px 0 0; font-size:14px; line-height:1.35; }
+  .node-id { margin-top:5px; color:var(--muted-2); font-size:9px; }
+  .inspector-body { overflow:auto; padding:12px 14px 18px; }
+  .section { padding:12px 0; border-bottom:1px solid var(--line-soft); }
+  .section:first-child { padding-top:0; }
+  .section:last-child { border-bottom:0; }
+  .section-title { color:var(--muted-2); font-size:9px; text-transform:uppercase; letter-spacing:.12em; font-weight:700; margin-bottom:8px; }
+  .summary-block { font-size:10px; color:#c5ceda; line-height:1.55; }
+  .summary-block b { color:#fff; font-weight:600; }
+  .kv { display:grid; grid-template-columns:78px 1fr; row-gap:7px; font-size:9px; }
+  .kv dt { color:var(--muted-2); }
+  .kv dd { margin:0; color:#c5ceda; }
+  .evidence-item {
+    display:grid; grid-template-columns:25px 1fr auto; gap:8px; align-items:start; padding:8px;
+    border:1px solid var(--line-soft); background:#0d1118; border-radius:9px; margin-bottom:6px;
+  }
+  .evidence-icon { width:24px;height:24px;border-radius:7px;background:var(--panel-3);display:grid;place-items:center;font-size:10px;color:var(--muted); }
+  .evidence-item h5 { margin:0; font-size:9px; font-weight:600; }
+  .evidence-item p { margin:4px 0 0; color:var(--muted-2); font-size:8px; line-height:1.4; }
+  .evidence-time { color:var(--muted-2); font-size:8px; }
+  .tag-row { display:flex; flex-wrap:wrap; gap:5px; }
+  .tag { font-size:8px; color:var(--muted); border:1px solid var(--line); border-radius:6px; padding:4px 6px; background:#0d1118; }
+  .edit-row { display:flex; gap:7px; margin-top:10px; }
+  .small-btn { flex:1; border:1px solid var(--line); background:var(--panel-2); color:var(--muted); border-radius:8px; padding:7px; font-size:9px; cursor:pointer; }
+  .small-btn:hover { color:#fff; }
+  .toast {
+    position:fixed; left:50%; bottom:20px; transform:translate(-50%,20px); opacity:0; z-index:50;
+    background:#1a2230; border:1px solid #354158; padding:9px 12px; border-radius:9px; font-size:10px; color:#d8dfe9;
+    box-shadow:var(--shadow); transition:.25s;
+  }
+  .toast.show { opacity:1; transform:translate(-50%,0); }
+  .kbd { border:1px solid var(--line); border-bottom-color:#3a4658; background:#0d1118; border-radius:5px; padding:2px 4px; font-size:8px; color:var(--muted-2); }
+  .mini-legend { position:absolute; left:12px; bottom:10px; z-index:5; display:flex; gap:8px; padding:7px 9px; border:1px solid var(--line); background:rgba(16,20,27,.88); border-radius:9px; backdrop-filter:blur(8px); }
+  .legend-item { display:flex; align-items:center; gap:5px; color:var(--muted-2); font-size:8px; }
+  .legend-swatch { width:8px;height:8px;border-radius:3px; }
+  @media (max-width: 1180px) {
+    .workspace { grid-template-columns: 0 minmax(600px,1fr) 320px; }
+    .sidebar { overflow:hidden; border:0; }
+    .brand { min-width:170px; }
+    .summary-strip { grid-template-columns:minmax(240px,1fr) repeat(4,76px); }
+    .metric-card:nth-last-child(-n+2) { display:none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *:before, *:after { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div><div class="brand-name">IntentTrace</div><div class="brand-sub">Evidence-backed agent traces</div></div>
+    </div>
+    <div class="trace-title">
+      <strong>构建 Multi-Agent Trace Viewer 与低成本意图总结</strong>
+      <span>trace_01J8F4 · intenttrace/demo · live session</span>
+    </div>
+    <div class="segmented" aria-label="Interpretation mode">
+      <button class="active" data-mode="live">Live</button>
+      <button data-mode="final">Final</button>
+    </div>
+    <button class="action-btn primary" id="playBtn">▶ <span>Replay</span></button>
+    <button class="action-btn" id="pauseBtn">Ⅱ <span>Pause</span></button>
+    <button class="action-btn"><span class="dot"></span> Connected</button>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="side-head">
+        <div class="side-head-row"><span class="eyebrow">Traces</span><span class="kbd">⌘ K</span></div>
+        <div class="search">⌕ Search intent, agent, file…</div>
+      </div>
+      <div class="trace-list">
+        <div class="trace-item active">
+          <div class="trace-row"><span class="trace-status live"></span><div><h4>构建 Multi-Agent Trace Viewer 与低成本意图总结</h4><p>规范化 trace、动态图、Gantt 与 evidence inspector。</p></div></div>
+          <div class="trace-meta"><span>6 agents</span><span>2m 04s</span><span>live</span></div>
+        </div>
+        <div class="trace-item">
+          <div class="trace-row"><span class="trace-status done"></span><div><h4>修复增量布局中的节点抖动</h4><p>将 full relayout 改为 affected-subgraph layout。</p></div></div>
+          <div class="trace-meta"><span>3 agents</span><span>46s</span><span>$0.08</span></div>
+        </div>
+        <div class="trace-item">
+          <div class="trace-row"><span class="trace-status fail"></span><div><h4>导入旧版 Claude Code JSONL</h4><p>adapter 在 parent UUID 推断阶段失败。</p></div></div>
+          <div class="trace-meta"><span>2 agents</span><span>1m 18s</span><span>1 failure</span></div>
+        </div>
+        <div class="trace-item">
+          <div class="trace-row"><span class="trace-status done"></span><div><h4>对比两个 summarizer 的 graph patch</h4><p>评测 evidence precision 与 duplicate node rate。</p></div></div>
+          <div class="trace-meta"><span>4 agents</span><span>3m 11s</span><span>final</span></div>
+        </div>
+      </div>
+      <div class="sidebar-footer">
+        <div class="budget-card">
+          <div class="budget-title"><span>Monthly summary budget</span><strong>31%</strong></div>
+          <div class="budget-bar"><span></span></div>
+          <div class="budget-note">$6.20 / $20.00 · DeepSeek Flash + GPT Luna</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="summary-strip">
+        <div class="now-card">
+          <div class="now-label"><span class="dot"></span> Current semantic state</div>
+          <div class="now-text" id="nowText">准备回放：原始事件已就绪，语义图尚未生成。</div>
+          <div class="now-sub" id="nowSub">Raw trace remains available even when the summarizer is pending.</div>
+        </div>
+        <div class="metric-card"><div class="metric-label">Duration</div><div class="metric-value" id="durationMetric">0:00</div><div class="metric-delta">live</div></div>
+        <div class="metric-card"><div class="metric-label">Agents</div><div class="metric-value">6</div><div class="metric-delta">3 parallel</div></div>
+        <div class="metric-card"><div class="metric-label">Raw events</div><div class="metric-value" id="eventsMetric">0</div><div class="metric-delta">→ 10 nodes</div></div>
+        <div class="metric-card"><div class="metric-label">Failures</div><div class="metric-value" id="failMetric">0</div><div class="metric-delta">resolved</div></div>
+        <div class="metric-card"><div class="metric-label">Summary cost</div><div class="metric-value" id="costMetric">$0.000</div><div class="metric-delta">cached</div></div>
+        <div class="metric-card"><div class="metric-label">Evidence</div><div class="metric-value" id="coverageMetric">0%</div><div class="metric-delta">coverage</div></div>
+      </section>
+
+      <section class="graph-shell">
+        <div class="graph-toolbar">
+          <div class="toolbar-group">
+            <button class="tool-chip active">Intent tree</button>
+            <button class="tool-chip">Raw spans</button>
+            <button class="tool-chip">Failures only</button>
+          </div>
+          <div class="toolbar-group">
+            <button class="tool-chip active">L1</button>
+            <button class="tool-chip">L2</button>
+            <button class="tool-chip">Fit</button>
+          </div>
+        </div>
+        <div class="graph-viewport" id="graphViewport">
+          <div class="graph-canvas" id="graphCanvas">
+            <div class="lane-labels"><div class="lane-label">Research / Ingest</div><div class="lane-label">Orchestrator</div><div class="lane-label">Frontend / Test</div></div>
+            <div class="lane-line l1"></div><div class="lane-line l2"></div><div class="lane-line l3"></div>
+            <svg class="graph-svg" viewBox="0 0 900 990" aria-hidden="true">
+              <path id="e1" class="edge" d="M450 158 C450 170 450 180 450 190"/>
+              <path id="e2" class="edge handoff" d="M450 288 C420 305 260 305 150 330"/>
+              <path id="e3" class="edge" d="M450 288 C450 302 450 315 450 330"/>
+              <path id="e4" class="edge handoff" d="M450 288 C480 305 640 305 750 330"/>
+              <path id="e5" class="edge merge" d="M150 428 C190 455 330 450 450 470"/>
+              <path id="e6" class="edge merge" d="M450 428 C450 445 450 455 450 470"/>
+              <path id="e7" class="edge issue" d="M750 428 C750 452 750 470 750 500"/>
+              <path id="e8" class="edge issue" d="M750 598 C700 620 560 615 450 625"/>
+              <path id="e9" class="edge" d="M450 568 C450 588 450 605 450 625"/>
+              <path id="e10" class="edge handoff" d="M450 723 C510 742 650 735 750 745"/>
+              <path id="e11" class="edge merge" d="M750 843 C680 865 560 860 450 870"/>
+            </svg>
+
+            <div class="semantic-node" id="n1" style="left:327px;top:60px" data-step="0"></div>
+            <div class="semantic-node" id="n2" style="left:327px;top:190px" data-step="1"></div>
+            <div class="semantic-node" id="n3" style="left:27px;top:330px" data-step="2"></div>
+            <div class="semantic-node" id="n4" style="left:327px;top:330px" data-step="3"></div>
+            <div class="semantic-node" id="n5" style="left:627px;top:330px" data-step="4"></div>
+            <div class="semantic-node" id="n6" style="left:327px;top:470px" data-step="5"></div>
+            <div class="semantic-node issue" id="n7" style="left:627px;top:500px" data-step="6"></div>
+            <div class="semantic-node" id="n8" style="left:327px;top:625px" data-step="7"></div>
+            <div class="semantic-node" id="n9" style="left:627px;top:745px" data-step="8"></div>
+            <div class="semantic-node result" id="n10" style="left:327px;top:870px" data-step="9"></div>
+          </div>
+        </div>
+        <div class="mini-legend">
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span>Intent/work</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--red)"></span>Issue</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span>Result</div>
+          <div class="legend-item">Dashed edge = handoff</div>
+        </div>
+      </section>
+
+      <section class="timeline-shell">
+        <div class="timeline-head">
+          <div class="timeline-title">Agent Gantt <span>semantic nodes and raw spans are synchronized</span></div>
+          <div class="timeline-controls"><button class="tool-chip active">All spans</button><button class="tool-chip">Critical path</button><button class="tool-chip">Collapse tools</button></div>
+        </div>
+        <div class="timeline">
+          <div class="lane-names" id="laneNames"></div>
+          <div class="timeline-grid" id="timelineGrid">
+            <div class="time-axis" id="timeAxis"></div>
+            <div class="gantt-canvas" id="ganttCanvas"><div class="playhead" id="playhead"></div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="inspector">
+      <div class="inspector-head">
+        <div class="inspector-title-row"><div><span class="eyebrow" id="inspectKind">Request</span><h2 id="inspectTitle">构建可理解的 Multi-Agent Trace</h2><div class="node-id" id="inspectId">node n1 · live-r0</div></div><button class="tool-chip">•••</button></div>
+      </div>
+      <div class="inspector-body">
+        <div class="section">
+          <div class="section-title">Semantic summary</div>
+          <div class="summary-block" id="inspectSummary"><b>Intent.</b> 将复杂的多智能体日志压缩为动态意图图，并保留 Gantt 与原始证据。</div>
+          <div class="edit-row"><button class="small-btn" id="editBtn">Edit summary</button><button class="small-btn" id="pinBtn">Pin node</button></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Provenance</div>
+          <dl class="kv"><dt>Source</dt><dd id="inspectProv">stated</dd><dt>Confidence</dt><dd id="inspectConfidence">high · direct user request</dd><dt>Status</dt><dd id="inspectStatus">active</dd><dt>Agent</dt><dd id="inspectAgent">Orchestrator</dd></dl>
+        </div>
+        <div class="section">
+          <div class="section-title">Evidence</div>
+          <div id="evidenceList"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Artifacts & tags</div>
+          <div class="tag-row" id="tagRow"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Revision</div>
+          <dl class="kv"><dt>Created</dt><dd id="inspectCreated">live-r0 · 00:00</dd><dt>Model</dt><dd id="inspectModel">gpt-5.6-luna</dd><dt>Prompt</dt><dd>chunk-summary-v3</dd><dt>Evidence hash</dt><dd id="inspectHash">7c41…d92a</dd></dl>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast">Node pinned. Final reconciliation will preserve it.</div>
+
+<script>
+const nodes = [
+  {
+    id:'n1', kind:'REQUEST', icon:'◎', title:'构建可理解的 Multi-Agent Trace',
+    summary:'将复杂执行日志压缩为动态意图图，同时保留 Gantt、成本和原始证据。',
+    detail:'Intent. 将复杂的多智能体日志压缩为动态意图图，并保留 Gantt 与原始证据。\nAction. 提取交付目标、约束和成功标准，形成根节点。',
+    agent:'Orchestrator', status:'active', confidence:'96%', prov:'stated', time:'00:00', events:1, duration:'2s', cost:0.0003,
+    tags:['user request','root intent','explicit'], evidence:[['▣','User message','“需要动态意图节点、Gantt、低成本 API 总结与完整设计。”','00:00']], hash:'7c41…d92a'
+  },
+  {
+    id:'n2', kind:'GOAL', icon:'◇', title:'拆分双图架构与产品边界',
+    summary:'将 raw execution facts 与可版本化 semantic graph 分离，避免总结覆盖事实。',
+    detail:'Intent. 先确定可理解性与保真性的系统边界。\nAction. 定义 ETG、EIG、evidence link 和 revision。',
+    agent:'Orchestrator', status:'completed', confidence:'91%', prov:'stated + inferred', time:'00:08', events:14, duration:'18s', cost:0.0011,
+    tags:['architecture','ETG','EIG'], evidence:[['◫','Planning message','定义 raw trace、semantic node、evidence 三层。','00:08'],['⌁','Agent handoff','委派 researcher、backend、frontend 三个分支。','00:13']], hash:'ab12…118f'
+  },
+  {
+    id:'n3', kind:'WORK', icon:'⌕', title:'调研 Trace 与 Agent 语义规范',
+    summary:'对比 OpenTelemetry、OpenInference 与现有观测工具，确定可复用的数据概念。',
+    detail:'Intent. 找到兼容多种 Agent runtime 的规范入口。\nAction. 阅读 span、agent、tool、session、trace 和 observation 语义。\nOutcome. 建议 OTLP/OpenInference 作为 canonical ingress。',
+    agent:'Researcher', status:'completed', confidence:'88%', prov:'inferred', time:'00:21', events:38, duration:'31s', cost:0.0017,
+    tags:['OpenTelemetry','OpenInference','research'], evidence:[['▤','Document reads','读取 8 份规范与项目文档。','00:21'],['✓','Finding','OpenInference 可表达 LLM、tool、retrieval 与 agent spans。','00:46']], hash:'14e8…c101'
+  },
+  {
+    id:'n4', kind:'WORK', icon:'⌘', title:'建立 Canonical Event Schema',
+    summary:'规范 message、agent、tool、file、test 与 artifact 事件，并保留 source-specific 字段。',
+    detail:'Intent. 让 Claude、Codex 和 OTLP 事件进入同一查询模型。\nAction. 新建 schema、normalizer 和 adapter contract。',
+    agent:'Backend', status:'completed', confidence:'93%', prov:'stated', time:'00:24', events:52, duration:'47s', cost:0.0022,
+    tags:['schema.ts','normalizer','adapter'], evidence:[['✎','File edits','schema.ts, importer.ts, ids.ts · +148/-27','00:24'],['▣','Typecheck','Canonical event union compiles.','00:58']], hash:'ee61…4781'
+  },
+  {
+    id:'n5', kind:'WORK', icon:'✦', title:'构建 Git-like 动态意图图',
+    summary:'按 Agent 分支布局语义节点，并将图、Gantt 与 inspector 进行双向联动。',
+    detail:'Intent. 用接近 Git history 的视觉结构表达并发与汇合。\nAction. 实现 custom nodes、edge animation、semantic zoom 和 evidence inspector。',
+    agent:'Frontend', status:'completed', confidence:'90%', prov:'stated', time:'00:26', events:61, duration:'58s', cost:0.0028,
+    tags:['React Flow','ELK','animation'], evidence:[['✎','UI files','IntentGraph.tsx, Gantt.tsx, Inspector.tsx','00:26'],['◉','Visual check','节点可分支生长并保持已有位置稳定。','01:11']], hash:'6bce…380a'
+  },
+  {
+    id:'n6', kind:'DECISION', icon:'◆', title:'使用廉价模型生成 Graph Patch',
+    summary:'只向模型发送 event sketch 和有限 parent candidates，由 reducer 校验 patch。',
+    detail:'Intent. 降低成本并避免模型直接控制图结构。\nAction. 设计 chunk summary schema、provider router 与 deterministic reducer。\nOutcome. DeepSeek Flash 和 GPT Luna 均可作为 Tier-1 summarizer。',
+    agent:'Summarizer', status:'completed', confidence:'86%', prov:'mixed', time:'00:51', events:44, duration:'42s', cost:0.0034,
+    tags:['event sketch','JSON schema','graph patch'], evidence:[['▤','Event sketch','2,314 raw tokens compressed to 418 tokens.','00:51'],['⬡','Structured output','Patch passed Zod validation.','01:24']], hash:'901c…ff11'
+  },
+  {
+    id:'n7', kind:'ISSUE', icon:'!', title:'trace_id 类型不一致导致测试失败',
+    summary:'Codex importer 输出 bigint，而 canonical schema 要求 string，阻断批量导入。',
+    detail:'Intent. 验证所有 adapter 是否满足 canonical schema。\nAction. 运行 fixture tests。\nOutcome. 发现 trace_id bigint/string mismatch，测试失败。',
+    agent:'Test', status:'blocked', confidence:'99%', prov:'stated', time:'01:14', events:8, duration:'11s', cost:0.0004,
+    tags:['failure','trace_id','fixture'], evidence:[['×','Test failure','expected string, received bigint · 7 failed','01:14'],['▧','Stack trace','adapter-codex/normalizeId.ts:41','01:14']], hash:'f2a9…d612'
+  },
+  {
+    id:'n8', kind:'WORK', icon:'↺', title:'统一 ID Normalizer 并回归验证',
+    summary:'将所有 source ID 规范化为稳定字符串，修复 importer 并重新运行测试。',
+    detail:'Intent. 解决 adapter 间的 ID 表示冲突。\nAction. 修改 normalizeId，补充 bigint 与 UUID fixtures。\nOutcome. Adapter tests 恢复通过。',
+    agent:'Backend', status:'completed', confidence:'97%', prov:'stated', time:'01:27', events:26, duration:'29s', cost:0.0012,
+    tags:['repair','normalizeId','regression'], evidence:[['✎','Patch','normalizeId.ts +12/-4; added 6 fixtures.','01:27'],['✓','Test pass','adapter suite 42/42 passed.','01:49']], hash:'82af…07aa'
+  },
+  {
+    id:'n9', kind:'WORK', icon:'✓', title:'完成端到端 Trace 回放测试',
+    summary:'验证实时事件、semantic patch、节点动画、Gantt 联动和 evidence 回跳。',
+    detail:'Intent. 确认产品闭环不是静态 mock。\nAction. 运行端到端 replay、断线重连与 evidence tests。\nOutcome. 82 tests 通过，未发现 unsupported claim。',
+    agent:'Test', status:'completed', confidence:'98%', prov:'stated', time:'01:56', events:31, duration:'23s', cost:0.0010,
+    tags:['Playwright','SSE','82 tests'], evidence:[['▶','Replay test','10 semantic nodes appeared in causal order.','01:56'],['✓','E2E result','82/82 passed; evidence coverage 100%.','02:17']], hash:'1d37…a63c'
+  },
+  {
+    id:'n10', kind:'RESULT', icon:'★', title:'形成可验证的动态意图分析闭环',
+    summary:'原始 trace、意图图、Gantt 与 evidence 已同步；失败被保留并链接到修复结果。',
+    detail:'Intent. 给 reviewer 一个二三十秒即可理解的 run narrative。\nAction. 汇合 ingest、summarizer、frontend 和 test 结果。\nOutcome. 关键闭环完成：raw → semantic → evidence → final revision。',
+    agent:'Orchestrator', status:'completed', confidence:'96%', prov:'mixed', time:'02:20', events:18, duration:'9s', cost:0.0009,
+    tags:['final result','verified','revision'], evidence:[['⇢','Agent merge','Backend, Frontend, Test results joined.','02:20'],['★','Final result','All deliverables mapped to completed evidence-backed nodes.','02:28']], hash:'db9d…440e'
+  }
+];
+
+const edgeSequence = [[],['e1'],['e2'],['e3'],['e4'],['e5','e6'],['e7'],['e8','e9'],['e10'],['e11']];
+const stepState = [
+  ['提取用户 request 的核心目标与交付物。','Root intent is stated directly by the user.'],
+  ['Orchestrator 正在定义双图架构与任务边界。','Raw facts and semantic interpretations are separated.'],
+  ['Researcher 正在对比 OTLP、OpenInference 与现有 trace 工具。','38 raw events are compressed into one research intent.'],
+  ['Backend 正在建立 canonical event schema。','Claude, Codex and OTLP events converge on one model.'],
+  ['Frontend 正在构建 Git-like 动态意图图与 evidence inspector。','New branches grow without moving stable nodes.'],
+  ['Summarizer 决定只生成受限 Graph Patch。','Cheap models see event sketches, not full logs.'],
+  ['测试发现 trace_id 类型冲突，导入流程被阻断。','The failure remains visible as a first-class issue node.'],
+  ['Backend 正在统一 ID normalizer 并执行回归测试。','The repair is linked to the issue rather than overwriting it.'],
+  ['Test Agent 正在验证回放、SSE 与 evidence 双向定位。','82 tests provide direct completion evidence.'],
+  ['所有分支已汇合，形成可验证的动态意图分析闭环。','Final interpretation is available without rewriting live history.']
+];
+
+const agents = [
+  {name:'Orchestrator', color:'#8b7cf6'}, {name:'Researcher', color:'#49d6d0'}, {name:'Backend', color:'#59b6ff'},
+  {name:'Frontend', color:'#e58bd8'}, {name:'Summarizer', color:'#f1b95b'}, {name:'Test', color:'#53d48a'}
+];
+const ganttBars = [
+  {agent:0,start:0,end:15,color:'#8b7cf6',step:0}, {agent:0,start:8,end:28,color:'#8b7cf6',step:1}, {agent:0,start:120,end:129,color:'#8b7cf6',step:9},
+  {agent:1,start:18,end:52,color:'#49d6d0',step:2}, {agent:1,start:24,end:31,color:'#49d6d0',step:2,type:'model'},
+  {agent:2,start:21,end:71,color:'#59b6ff',step:3}, {agent:2,start:87,end:116,color:'#59b6ff',step:7},
+  {agent:3,start:23,end:84,color:'#e58bd8',step:4}, {agent:3,start:33,end:39,color:'#e58bd8',step:4,type:'model'},
+  {agent:4,start:49,end:93,color:'#f1b95b',step:5}, {agent:4,start:52,end:56,color:'#f1b95b',step:5,type:'model'},
+  {agent:5,start:74,end:85,color:'#ff7373',step:6,error:true}, {agent:5,start:116,end:139,color:'#53d48a',step:8}
+];
+
+let timer = null;
+let currentStep = -1;
+let paused = false;
+let selectedNode = nodes[0];
+const maxTime = 140;
+
+function nodeMarkup(n) {
+  const statusClass = n.status === 'completed' ? 'done' : n.status === 'blocked' ? 'blocked' : 'active';
+  return `<div class="node-top"><div class="node-icon">${n.icon}</div><div class="node-heading"><div class="node-kind">${n.kind}</div><div class="node-title">${n.title}</div></div><div class="confidence">${n.confidence}</div></div>
+  <div class="node-summary">${n.summary}</div>
+  <div class="node-meta"><span>${n.agent}</span><span>·</span><span>${n.events} events</span><span>·</span><span>${n.duration}</span><span class="status-pill ${statusClass}">${n.status}</span></div>`;
+}
+
+function initializeNodes() {
+  nodes.forEach(n => {
+    const el = document.getElementById(n.id);
+    el.innerHTML = nodeMarkup(n);
+    el.addEventListener('click', () => selectNode(n.id));
+  });
+  selectNode('n1');
+}
+
+function initializeTimeline() {
+  const laneNames = document.getElementById('laneNames');
+  const canvas = document.getElementById('ganttCanvas');
+  const axis = document.getElementById('timeAxis');
+  agents.forEach((a, i) => {
+    laneNames.insertAdjacentHTML('beforeend', `<div class="lane-name"><span class="agent-dot" style="background:${a.color}"></span>${a.name}</div>`);
+    const row = document.createElement('div'); row.className='gantt-row'; row.style.top=`${i*25}px`; canvas.appendChild(row);
+  });
+  for (let t=0;t<=140;t+=20) {
+    const x=t/maxTime*900;
+    axis.insertAdjacentHTML('beforeend', `<span class="time-tick" style="left:${x}px">${t}s</span><span class="time-line" style="left:${x}px"></span>`);
+  }
+  ganttBars.forEach((b,i) => {
+    const bar=document.createElement('div');
+    bar.className=`bar ${b.type||''} ${b.error?'error':''}`;
+    bar.dataset.step=b.step;
+    bar.style.left=`${b.start/maxTime*900}px`;
+    bar.style.width=`${Math.max(6,(b.end-b.start)/maxTime*900)}px`;
+    bar.style.top=`${b.agent*25 + (b.type==='model'?7:5)}px`;
+    bar.style.background=b.color;
+    bar.title=`${agents[b.agent].name} · ${b.start}s–${b.end}s`;
+    bar.addEventListener('click',()=>selectNode(nodes[b.step].id));
+    canvas.appendChild(bar);
+  });
+}
+
+function resetReplay() {
+  clearTimeout(timer); currentStep=-1; paused=false;
+  document.querySelectorAll('.semantic-node').forEach(el=>el.classList.remove('visible','pending','active','selected'));
+  document.querySelectorAll('.edge').forEach(el=>el.classList.remove('visible'));
+  document.querySelectorAll('.bar').forEach(el=>el.classList.remove('visible','highlight'));
+  document.getElementById('playhead').style.left='0px';
+  document.getElementById('nowText').textContent='准备回放：原始事件已就绪，语义图尚未生成。';
+  document.getElementById('nowSub').textContent='Raw trace remains available even when the summarizer is pending.';
+  updateMetrics(-1);
+}
+
+function runStep(index) {
+  if (paused || index >= nodes.length) return;
+  currentStep=index;
+  const n=nodes[index]; const el=document.getElementById(n.id);
+  el.classList.add('visible','pending');
+  document.querySelectorAll('.semantic-node.active').forEach(x=>x.classList.remove('active'));
+  edgeSequence[index].forEach(id=>document.getElementById(id).classList.add('visible'));
+  document.querySelectorAll(`.bar[data-step="${index}"]`).forEach(b=>b.classList.add('visible'));
+  document.getElementById('nowText').textContent=stepState[index][0];
+  document.getElementById('nowSub').textContent=stepState[index][1];
+  const eventTime = [2,18,39,42,45,72,78,98,122,138][index];
+  document.getElementById('playhead').style.left=`${eventTime/maxTime*900}px`;
+  updateMetrics(index);
+  setTimeout(()=>{
+    el.classList.remove('pending'); el.classList.add('active'); selectNode(n.id, false);
+  },520);
+  timer=setTimeout(()=>runStep(index+1), 1050);
+}
+
+function updateMetrics(step) {
+  if (step<0) {
+    document.getElementById('durationMetric').textContent='0:00';
+    document.getElementById('eventsMetric').textContent='0';
+    document.getElementById('failMetric').textContent='0';
+    document.getElementById('costMetric').textContent='$0.000';
+    document.getElementById('coverageMetric').textContent='0%'; return;
+  }
+  const sec=[2,18,39,42,45,72,78,98,122,138][step];
+  document.getElementById('durationMetric').textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
+  document.getElementById('eventsMetric').textContent=nodes.slice(0,step+1).reduce((a,n)=>a+n.events,0);
+  document.getElementById('failMetric').textContent=step>=6?'1':'0';
+  document.getElementById('costMetric').textContent=`$${nodes.slice(0,step+1).reduce((a,n)=>a+n.cost,0).toFixed(3)}`;
+  document.getElementById('coverageMetric').textContent=`${Math.min(100,78+step*2)}%`;
+}
+
+function selectNode(id, scroll=true) {
+  const n=nodes.find(x=>x.id===id); if(!n) return; selectedNode=n;
+  document.querySelectorAll('.semantic-node').forEach(x=>x.classList.remove('selected'));
+  const el=document.getElementById(id); if(el.classList.contains('visible') || currentStep<0) el.classList.add('selected');
+  document.querySelectorAll('.bar').forEach(b=>b.classList.toggle('highlight', Number(b.dataset.step)===nodes.indexOf(n)));
+  document.getElementById('inspectKind').textContent=n.kind;
+  document.getElementById('inspectTitle').textContent=n.title;
+  document.getElementById('inspectId').textContent=`node ${n.id} · live-r${Math.max(0,nodes.indexOf(n))}`;
+  document.getElementById('inspectSummary').innerHTML=n.detail.split('\n').map(line=>{
+    const p=line.split('. '); return `<div style="margin-bottom:6px"><b>${p[0]}.</b> ${p.slice(1).join('. ')}</div>`;
+  }).join('');
+  document.getElementById('inspectProv').textContent=n.prov;
+  document.getElementById('inspectConfidence').textContent=`${n.confidence} · ${n.prov}`;
+  document.getElementById('inspectStatus').textContent=n.status;
+  document.getElementById('inspectAgent').textContent=n.agent;
+  document.getElementById('inspectCreated').textContent=`live-r${Math.max(0,nodes.indexOf(n))} · ${n.time}`;
+  document.getElementById('inspectModel').textContent= n.id==='n6' ? 'deepseek-v4-flash' : 'gpt-5.6-luna';
+  document.getElementById('inspectHash').textContent=n.hash;
+  document.getElementById('evidenceList').innerHTML=n.evidence.map(e=>`<div class="evidence-item"><div class="evidence-icon">${e[0]}</div><div><h5>${e[1]}</h5><p>${e[2]}</p></div><div class="evidence-time">${e[3]}</div></div>`).join('');
+  document.getElementById('tagRow').innerHTML=n.tags.map(t=>`<span class="tag">${t}</span>`).join('');
+  if(scroll && el.classList.contains('visible')) el.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+}
+
+function play() {
+  resetReplay();
+  setTimeout(()=>runStep(0),250);
+}
+function pause() { paused=true; clearTimeout(timer); document.getElementById('nowSub').textContent='Replay paused. Raw and semantic states remain synchronized.'; }
+function resume() { if(!paused) return; paused=false; runStep(Math.min(nodes.length,currentStep+1)); }
+function showToast(text) { const t=document.getElementById('toast'); t.textContent=text; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+
+document.getElementById('playBtn').addEventListener('click',play);
+document.getElementById('pauseBtn').addEventListener('click',()=> paused ? resume() : pause());
+document.getElementById('pinBtn').addEventListener('click',()=>showToast('Node pinned. Final reconciliation will preserve it.'));
+document.getElementById('editBtn').addEventListener('click',()=>showToast('Prototype: inline summary editor would open here.'));
+document.querySelectorAll('.segmented button').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.segmented button').forEach(x=>x.classList.remove('active')); btn.classList.add('active');
+  showToast(btn.dataset.mode==='final'?'Final revision selected. Live history remains unchanged.':'Live interpretation selected.');
+}));
+document.querySelectorAll('.tool-chip').forEach(btn=>btn.addEventListener('click',()=>{
+  if(btn.textContent==='Failures only') {
+    btn.classList.toggle('active'); document.querySelectorAll('.semantic-node').forEach((el,i)=>{ if(nodes[i].kind!=='ISSUE' && btn.classList.contains('active')) el.style.opacity='.12'; else el.style.opacity=''; });
+  }
+}));
+
+initializeNodes(); initializeTimeline(); resetReplay();
+setTimeout(play,650);
+</script>
+</body>
+</html>

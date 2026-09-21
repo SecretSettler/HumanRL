@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a scoped improvement
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the user problem before the solution. Proposals must preserve append-only raw facts, evidence-backed revisions, deterministic commit ownership, and the no-hidden-chain-of-thought boundary.
+  - type: textarea
+    attributes:
+      label: Problem
+      description: Who is affected and what cannot be done today?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed outcome
+      description: Describe observable behavior, not only implementation.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: true
+  - type: checkboxes
+    attributes:
+      label: Impact areas
+      options:
+        - label: Domain schema / generated JSON Schema
+        - label: Drizzle schema / migration
+        - label: API / generated OpenAPI / SSE
+        - label: Privacy / provider egress / threat model
+        - label: UI / accessibility
+        - label: Operations / release artifacts
+  - type: textarea
+    attributes:
+      label: Evidence and acceptance criteria
+      description: What deterministic tests or environment evidence would establish completion?
+    validations:
+      required: true

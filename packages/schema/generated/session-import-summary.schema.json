@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "protocolVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "level": {
+      "type": "string",
+      "const": "summary"
+    },
+    "command": {
+      "type": "string",
+      "const": "import"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "jsonl",
+        "otlp",
+        "codex",
+        "claude",
+        "opencode",
+        "omp",
+        "grok"
+      ]
+    },
+    "files": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "imported": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "failed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "inserted": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "duplicates": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "warnings": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "matchedFiles": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "skippedByLimit": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "unreadableDirectories": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "rejectedFiles": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "missingSessionIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{24}$"
+      }
+    },
+    "firstError": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "level",
+    "command",
+    "source",
+    "files",
+    "imported",
+    "failed",
+    "inserted",
+    "duplicates",
+    "warnings",
+    "matchedFiles",
+    "skippedByLimit",
+    "unreadableDirectories",
+    "rejectedFiles",
+    "missingSessionIds"
+  ],
+  "additionalProperties": false
+}

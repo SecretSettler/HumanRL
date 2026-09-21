@@ -1,0 +1,25 @@
+{
+  "intenttraceOtlpVersion": "1.11-json",
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [{ "key": "service.name", "value": { "stringValue": "fixture-agent" } }]
+      },
+      "scopeSpans": [
+        {
+          "spans": [
+            {
+              "traceId": "00112233445566778899aabbccddeeff",
+              "spanId": "0011223344556677",
+              "name": "tool execution",
+              "startTimeUnixNano": "1785542400000000000",
+              "endTimeUnixNano": "1785542401000000000",
+              "status": { "code": "STATUS_CODE_OK" },
+              "attributes": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{"type":"title","v":1,"title":"Anonymous","updatedAt":"2026-08-01T00:00:00.000Z","pad":""}
+{"type":"session","id":"omp-root","timestamp":"2026-08-01T00:00:00.000Z","cwd":"/home/must-not-persist-user/scratch"}
+{"type":"message","id":"spawn","timestamp":"2026-08-01T00:00:01.000Z","message":{"role":"toolResult","toolName":"task","details":{"progress":[{"id":"Child","status":"completed"},{"id":"Sibling","status":"completed"},{"id":"Synthetic","status":"skipped","executed":false}]}}}
+{"type":"custom_message","customType":"async-result","timestamp":"2026-08-01T00:00:05.000Z","details":{"jobs":[{"jobId":"Child","status":"completed"}]}}
+{"type":"message","id":"peer","timestamp":"2026-08-01T00:00:06.000Z","message":{"role":"toolResult","toolName":"hub","details":{"waited":{"id":"msg-1","from":"Sibling","to":"Child","body":"hello","ts":1}}}}

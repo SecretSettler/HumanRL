@@ -1,0 +1,1 @@
+{"type":"tool_result","version":"claude-jsonl-v1","uuid":"tool-1","sessionId":"claude-error","timestamp":"2026-08-01T00:00:00.000Z","is_error":true,"message":{"role":"tool","content":"Synthetic failure"}}

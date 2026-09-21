@@ -1,0 +1,3 @@
+{"type":"title","v":1,"title":"Sibling","updatedAt":"2026-08-01T00:00:00.000Z","pad":""}
+{"type":"session","id":"sibling-session","timestamp":"2026-08-01T00:00:03.000Z"}
+{"type":"session_init","id":"init","timestamp":"2026-08-01T00:00:03.100Z","agent":"task","task":"Send message"}

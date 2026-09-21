@@ -1,0 +1,4 @@
+{"type":"session_meta","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:02.500Z","payload":{"id":"codex-child","session_id":"codex-root","parent_thread_id":"codex-root","source":{"subagent":{"thread_spawn":{"parent_thread_id":"codex-root"}}},"multi_agent_version":"v2","history_mode":"legacy"}}
+{"type":"event_msg","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:03.000Z","payload":{"type":"user_message","message":"Task"}}
+{"type":"response_item","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:04.000Z","payload":{"id":"message-1","type":"agent_message","author":"codex-child","recipient":"codex-root","content":[{"type":"input_text","text":"Message Type: FINAL_ANSWER\nSender: codex-child\nPayload:\nDone"}]}}
+{"type":"event_msg","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:05.000Z","payload":{"type":"reasoning","text":"must-not-persist-codex"}}

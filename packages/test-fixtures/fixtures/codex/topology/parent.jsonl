@@ -1,0 +1,5 @@
+{"type":"session_meta","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:00.000Z","payload":{"id":"codex-root","session_id":"codex-root","multi_agent_version":"v2","history_mode":"legacy"}}
+{"type":"response_item","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:01.000Z","payload":{"id":"spawn-item","type":"function_call","name":"spawn_agent","namespace":"collaboration","arguments":"{\"task_name\":\"child\",\"message\":\"[encrypted omitted]\"}","call_id":"call-spawn-1"}}
+{"type":"event_msg","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:02.000Z","payload":{"type":"sub_agent_activity","event_id":"call-spawn-1","agent_thread_id":"codex-child","kind":"started"}}
+{"type":"response_item","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:03.000Z","payload":{"id":"message-1","type":"agent_message","author":"codex-child","recipient":"codex-root","content":[{"type":"input_text","text":"Message Type: FINAL_ANSWER\nSender: codex-child\nPayload:\nDone"}]}}
+{"type":"turn_context","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:04.000Z","payload":{"id":"root-turn","parent_thread_id":"ignored"}}

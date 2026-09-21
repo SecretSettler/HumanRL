@@ -1,0 +1,7 @@
+{
+  "subagent_id": "grok-only",
+  "child_session_id": "grok-only",
+  "parent_session_id": "grok-root",
+  "status": "completed",
+  "child_cwd": "/home/must-not-persist-user/Projects/demo"
+}

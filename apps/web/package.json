@@ -1,0 +1,30 @@
+{
+  "name": "@intenttrace/web",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@intenttrace/graph-layout": "workspace:*",
+    "@intenttrace/schema": "workspace:*",
+    "@intenttrace/ui": "workspace:*",
+    "@tailwindcss/postcss": "4.3.3",
+    "@xyflow/react": "12.11.2",
+    "elkjs": "0.12.0",
+    "next": "16.3.0",
+    "postcss": "8.5.25",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwindcss": "4.3.3",
+    "zustand": "5.0.14"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4"
+  }
+}

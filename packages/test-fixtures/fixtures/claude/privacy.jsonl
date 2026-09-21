@@ -1,0 +1,4 @@
+{"type":"mode","mode":"default","sessionId":"claude-privacy"}
+{"type":"user","version":"2.1.69","uuid":"message-1","sessionId":"claude-privacy","timestamp":"2026-08-01T00:00:00.000Z","message":{"role":"user","content":"Visible request"}}
+{"type":"assistant","version":"2.1.69","uuid":"message-2","sessionId":"claude-privacy","timestamp":"2026-08-01T00:00:01.000Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"must-not-persist","signature":"must-not-persist"},{"type":"text","text":"Visible answer"}]}}
+{"type":"file-history-snapshot","messageId":"message-2","snapshot":{"trackedFileBackups":{"secret.txt":{"content":"must-not-persist"}}}}

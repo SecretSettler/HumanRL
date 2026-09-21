@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "The desktop launcher only invokes hard-coded Rust commands.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

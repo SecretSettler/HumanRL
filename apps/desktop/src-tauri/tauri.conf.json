@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "IntentTrace",
+  "version": "0.0.0",
+  "identifier": "local.intenttrace.desktop",
+  "build": {
+    "frontendDist": "../frontend",
+    "beforeBuildCommand": "pnpm --dir ../.. desktop:prepare"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost http://127.0.0.1:*"
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "IntentTrace",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 720,
+        "center": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "resources": ["resources/intenttrace-stack.tar.gz"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "Evidence-backed local agent trace workbench",
+    "longDescription": "IntentTrace runs a local, single-host workbench that turns raw agent execution facts into an evidence-backed semantic graph. The desktop launcher starts the bundled Docker stack and opens the dynamically assigned loopback port; no data leaves the machine by default.",
+    "copyright": "Copyright © 2026 IntentTrace contributors. Licensed under AGPL-3.0-only.",
+    "licenseFile": "../../../LICENSE",
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "dmg": {
+        "windowSize": { "width": 660, "height": 400 },
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 }
+      }
+    }
+  }
+}

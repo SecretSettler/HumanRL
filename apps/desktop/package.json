@@ -1,0 +1,15 @@
+{
+  "name": "@intenttrace/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "tauri": "tauri",
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "node scripts/check.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4"
+  }
+}

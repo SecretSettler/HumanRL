@@ -1,0 +1,34 @@
+{
+  "name": "@intenttrace/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": {
+      "types": "./src/app.ts",
+      "import": "./dist/app.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "openapi:generate": "tsx scripts/generate-openapi.ts"
+  },
+  "dependencies": {
+    "@fastify/swagger": "9.8.1",
+    "@fastify/swagger-ui": "6.1.1",
+    "@intenttrace/adapters": "workspace:*",
+    "@intenttrace/config": "workspace:*",
+    "@intenttrace/db": "workspace:*",
+    "@intenttrace/schema": "workspace:*",
+    "@intenttrace/storage": "workspace:*",
+    "fastify": "5.11.2",
+    "fastify-type-provider-zod": "7.0.0",
+    "postgres": "3.4.9",
+    "yaml": "2.9.0",
+    "zod": "4.4.3"
+  }
+}

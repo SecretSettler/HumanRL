@@ -1,0 +1,6 @@
+{
+  "type": "session_meta",
+  "version": "codex-jsonl-v1",
+  "timestamp": "2026-08-01T00:00:00.000Z",
+  "payload": { "id": "codex-fixture", "agent_id": "orchestrator" }
+}

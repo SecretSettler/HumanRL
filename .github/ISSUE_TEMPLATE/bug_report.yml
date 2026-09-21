@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible IntentTrace defect
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Use synthetic or irreversibly anonymized data only. Do not include secrets, real traces/sessions, private source, database dumps, or complete logs. Security vulnerabilities must follow SECURITY.md instead.
+  - type: checkboxes
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues for duplicates.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+        - label: I removed secrets and private trace/session content.
+          required: true
+  - type: dropdown
+    attributes:
+      label: Area
+      options:
+        - Web workbench
+        - API / SSE
+        - Collector / adapter
+        - Worker / reducer
+        - Database / migration
+        - Docker / deployment
+        - Desktop / macOS
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Environment
+      description: OS, architecture, Node, pnpm, Docker/Compose, browser, and commit/version.
+      placeholder: Linux x86_64; Node 24.18.1; pnpm 11.18.0; Docker ...; commit ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction
+      description: Minimal steps using synthetic data.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Sanitized evidence
+      description: Small redacted excerpts or synthetic screenshots only. Do not paste complete logs.

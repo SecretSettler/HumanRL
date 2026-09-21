@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://intenttrace.local/schema/intent-graph-patch.schema.json",
+  "title": "IntentTrace IntentGraphPatch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chunkId",
+    "addNodes",
+    "updateNodes",
+    "addEdges",
+    "supersedeNodeIds",
+    "mergeSuggestions",
+    "unresolvedQuestions"
+  ],
+  "properties": {
+    "chunkId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "addNodes": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "$ref": "#/$defs/newNode" }
+    },
+    "updateNodes": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/nodeUpdate" }
+    },
+    "addEdges": {
+      "type": "array",
+      "maxItems": 24,
+      "items": { "$ref": "#/$defs/newEdge" }
+    },
+    "supersedeNodeIds": {
+      "type": "array",
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    },
+    "mergeSuggestions": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/mergeSuggestion" }
+    },
+    "unresolvedQuestions": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "minLength": 1, "maxLength": 240 }
+    }
+  },
+  "$defs": {
+    "nodeKind": {
+      "type": "string",
+      "enum": ["request", "goal", "work", "decision", "issue", "handoff", "result"]
+    },
+    "nodeStatus": {
+      "type": "string",
+      "enum": ["proposed", "active", "blocked", "completed", "abandoned", "superseded"]
+    },
+    "provenance": {
+      "type": "string",
+      "enum": ["stated", "inferred", "mixed"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "edgeKind": {
+      "type": "string",
+      "enum": [
+        "decomposes_to",
+        "attempts",
+        "depends_on",
+        "supports",
+        "blocks",
+        "resolved_by",
+        "hands_off_to",
+        "revises",
+        "produces",
+        "supersedes"
+      ]
+    },
+    "evidenceIds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    },
+    "newNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clientId",
+        "kind",
+        "status",
+        "title",
+        "intentSummary",
+        "provenance",
+        "confidence",
+        "participantAgentIds",
+        "evidenceEventIds",
+        "artifactIds"
+      ],
+      "properties": {
+        "clientId": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" },
+        "kind": { "$ref": "#/$defs/nodeKind" },
+        "status": { "$ref": "#/$defs/nodeStatus" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "intentSummary": { "type": "string", "minLength": 1, "maxLength": 360 },
+        "actionSummary": { "type": "string", "maxLength": 480 },
+        "outcomeSummary": { "type": "string", "maxLength": 480 },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "primaryParentId": { "type": "string", "maxLength": 128 },
+        "primaryAgentId": { "type": "string", "maxLength": 128 },
+        "participantAgentIds": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "evidenceEventIds": { "$ref": "#/$defs/evidenceIds" },
+        "artifactIds": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "nodeUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId", "evidenceEventIds"],
+      "properties": {
+        "nodeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "$ref": "#/$defs/nodeStatus" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "intentSummary": { "type": "string", "minLength": 1, "maxLength": 360 },
+        "actionSummary": { "type": "string", "maxLength": 480 },
+        "outcomeSummary": { "type": "string", "maxLength": 480 },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "primaryParentId": { "type": "string", "maxLength": 128 },
+        "primaryAgentId": { "type": "string", "maxLength": 128 },
+        "participantAgentIds": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "evidenceEventIds": { "$ref": "#/$defs/evidenceIds" },
+        "artifactIds": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "endedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "newEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceNodeId", "targetNodeId", "kind", "evidenceEventIds"],
+      "properties": {
+        "sourceNodeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "targetNodeId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "kind": { "$ref": "#/$defs/edgeKind" },
+        "evidenceEventIds": { "$ref": "#/$defs/evidenceIds" }
+      }
+    },
+    "mergeSuggestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeIds", "reason", "evidenceEventIds"],
+      "properties": {
+        "nodeIds": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "evidenceEventIds": { "$ref": "#/$defs/evidenceIds" }
+      }
+    }
+  }
+}

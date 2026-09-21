@@ -1,0 +1,5 @@
+{"type":"title","v":1,"title":"Child","updatedAt":"2026-08-01T00:00:00.000Z","pad":""}
+{"type":"session","id":"child-session","timestamp":"2026-08-01T00:00:02.000Z"}
+{"type":"session_init","id":"init","timestamp":"2026-08-01T00:00:02.100Z","agent":"task","task":"Do work","systemPrompt":"must-not-persist-omp-prompt"}
+{"type":"message","id":"child-think","timestamp":"2026-08-01T00:00:02.500Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"must-not-persist-omp"},{"type":"text","text":"Child answer"}]}}
+{"type":"custom_message","customType":"async-result","timestamp":"2026-08-01T00:00:04.000Z","details":{"jobs":[{"id":"Child","status":"completed"}]}}
