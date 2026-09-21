@@ -20,7 +20,7 @@ describe("evaluatePromptOptimization", () => {
     expect(result.independentTasks).toBe(0);
     expect(result.expectedSavedTokens).toBe(0);
     expect(result.reasons).toEqual([
-      "根 Agent 没有失败、重复或上下文压力信号，继续由当前 Agent 完成",
+      "No failure, repetition or context-pressure signal on the root lane; keep going with the current agent",
     ]);
   });
 
@@ -35,7 +35,9 @@ describe("evaluatePromptOptimization", () => {
     expect(result.repeatedToolCalls).toBe(2);
     expect(result.expectedSavedTokens).toBeGreaterThanOrEqual(result.spawnCostTokens);
     expect(result.decision).toBe("spawn");
-    expect(result.reasons).toContain("根 Agent 有 3 次工具失败，适合隔离到子 Agent 排查");
+    expect(result.reasons).toContain(
+      "Root agent has 3 failed tool calls; worth isolating that investigation in a child",
+    );
   });
 
   it("recommends a spawn when the root lane keeps accumulating model turns", () => {
@@ -53,7 +55,7 @@ describe("evaluatePromptOptimization", () => {
     const result = evaluatePromptOptimization({ events: s.events });
     expect(result.traceComplete).toBe(true);
     expect(result.decision).toBe("hold");
-    expect(result.reasons[0]).toMatch(/^trace 已结束/u);
+    expect(result.reasons[0]).toMatch(/^Trace is complete/u);
   });
 
   it("counts CJK prompts near one token per character", () => {
@@ -72,7 +74,9 @@ describe("evaluatePromptOptimization", () => {
     const result = evaluatePromptOptimization({ events: s.events });
     expect(result.activeChildren).toBe(1);
     expect(result.decision).toBe("hold");
-    expect(result.reasons[0]).toBe("已有 1 个子 Agent 在跑，先等 join，不要重复 spawn");
+    expect(result.reasons[0]).toBe(
+      "1 child agent is still running; wait for the join instead of spawning again",
+    );
   });
 });
 

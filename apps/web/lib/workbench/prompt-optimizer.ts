@@ -101,6 +101,19 @@ function isFailedResult(event: RawTraceEvent): boolean {
   );
 }
 
+/**
+ * Tokens in a user message. The name preview is capped at 240 characters, so
+ * when the sanitized payload is known its byte length (`{"text": …}` minus the
+ * wrapper) gives a better floor for long prompts.
+ */
+export function promptTokensOf(event: RawTraceEvent): number {
+  const preview = splitName(event.name).detail ?? event.name;
+  const fromPreview = estimateTokens(preview);
+  const bytes = event.payloadRef?.byteLength ?? 0;
+  const fromPayload = bytes > 0 ? Math.ceil(Math.max(0, bytes - 11) / 4) : 0;
+  return Math.max(fromPreview, fromPayload);
+}
+
 /** The root lane: the agent that received the first non-assigned user message. */
 export function rootAgentOf(events: readonly RawTraceEvent[]): string | null {
   const first = [...events]
@@ -200,9 +213,7 @@ export function evaluatePromptOptimization({
   const firstPrompt = ordered.find(
     (event) => event.kind === "user_message" && !stringAttr(event, "assignedBy"),
   );
-  const promptTokens = firstPrompt
-    ? estimateTokens(splitName(firstPrompt.name).detail ?? firstPrompt.name)
-    : 0;
+  const promptTokens = firstPrompt ? promptTokensOf(firstPrompt) : 0;
 
   const spawns = accountSpawns(ordered);
   const spawnedIds = new Set(spawns.flatMap((spawn) => spawn.childAgentIds));
@@ -247,22 +258,37 @@ export function evaluatePromptOptimization({
 
   const reasons: string[] = [];
   if (traceComplete)
-    reasons.push("trace 已结束，不再有派发时机；下面的 spawn 核算是这次运行的复盘");
+    reasons.push(
+      "Trace is complete, so there is no dispatch left; the ledger below is a post-mortem of this run",
+    );
   if (activeChildren > 0)
-    reasons.push(`已有 ${activeChildren} 个子 Agent 在跑，先等 join，不要重复 spawn`);
+    reasons.push(
+      `${activeChildren} child agent${activeChildren === 1 ? " is" : "s are"} still running; wait for the join instead of spawning again`,
+    );
   if (toolFailures > 0)
-    reasons.push(`根 Agent 有 ${toolFailures} 次工具失败，适合隔离到子 Agent 排查`);
-  if (repeatedToolCalls > 0) reasons.push(`根 Agent 重复了 ${repeatedToolCalls} 次相同工具动作`);
+    reasons.push(
+      `Root agent has ${toolFailures} failed tool call${toolFailures === 1 ? "" : "s"}; worth isolating that investigation in a child`,
+    );
+  if (repeatedToolCalls > 0)
+    reasons.push(
+      `Root agent repeated the same tool action ${repeatedToolCalls} time${repeatedToolCalls === 1 ? "" : "s"}`,
+    );
   if (contextPressure > CONTEXT_PRESSURE_FREE_TURNS)
-    reasons.push(`根 Agent 已累计 ${contextPressure} 轮 model call，上下文压力在涨`);
+    reasons.push(
+      `Root agent has taken ${contextPressure} model turns; its context is getting heavy`,
+    );
   const decision: PromptOptimizationDecision =
     !traceComplete && activeChildren === 0 && expectedSavedTokens >= spawnCostTokens
       ? "spawn"
       : "hold";
   if (decision === "spawn" && promptTokens > 0 && promptTokens < 40)
-    reasons.push(`初始 prompt 只有约 ${promptTokens} tok，派发前先把子任务边界写清楚`);
+    reasons.push(
+      `Prompt is only ~${promptTokens} tokens; write the sub-task boundary before dispatching`,
+    );
   if (reasons.length === 0)
-    reasons.push("根 Agent 没有失败、重复或上下文压力信号，继续由当前 Agent 完成");
+    reasons.push(
+      "No failure, repetition or context-pressure signal on the root lane; keep going with the current agent",
+    );
 
   return {
     decision,

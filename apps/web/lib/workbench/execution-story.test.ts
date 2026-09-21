@@ -26,7 +26,7 @@ describe("splitName / describeToolCall", () => {
   it("falls back to the kind when the name carries no description", () => {
     const s = new StoryEvents();
     const call = s.push("file_read", "read", "Orchestrator");
-    expect(describeToolCall(call)).toEqual({ tool: "read", action: "读取文件" });
+    expect(describeToolCall(call)).toEqual({ tool: "read", action: "Read a file" });
   });
 });
 

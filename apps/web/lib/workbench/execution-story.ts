@@ -115,11 +115,11 @@ const KIND_TOOL: Record<string, string> = {
 };
 
 const KIND_FALLBACK: Record<string, string> = {
-  file_read: "读取文件",
-  file_write: "写入文件",
-  shell_command: "运行命令",
-  test_run: "运行测试",
-  tool_call: "调用工具",
+  file_read: "Read a file",
+  file_write: "Wrote a file",
+  shell_command: "Ran a command",
+  test_run: "Ran tests",
+  tool_call: "Called a tool",
 };
 
 export function describeToolCall(event: RawTraceEvent): { tool: string; action: string } {

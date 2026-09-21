@@ -4,9 +4,24 @@ HumanRL is a local trace workbench built on [IntentTrace](https://github.com/chi
 
 - every tool call is turned into one readable line (`read ×4 · Reading parallel dispatch skill +3`), grouped per agent lane, with its result paired and its failure surfaced. Click a step to expand the individual calls; click a call to jump to the raw event and its evidence;
 - every subagent spawn is a step of its own: who dispatched whom, what for, and whether it paid off;
-- a **Prompt optimizer** card answers "should the root agent spawn now?" from signals visible without the prompt body, and a **spawn ledger** rates each spawn that already happened as 值得 / 勉强 / 浪费.
+- a **Prompt review** card shows the prompt you sent and what it caused: tools agents reached for that did not exist, how much task text the orchestrator had to write because the prompt left it out, waves that took most of the budget, work repeated across lanes, heavy assembly after the last join. Every finding has a "Show evidence" button that opens the raw event;
+- a **Prompt optimizer** card answers "should the root agent spawn now?" from signals visible without the prompt body, and a **spawn ledger** rates each spawn that already happened as Paid off / Marginal / Wasted.
 
-Nothing here reads the initial prompt or any hidden reasoning; the whole view is derived from event metadata (kind, name, status, agent, attributes). It replays with the ingest watermark like the rest of the workbench.
+The UI is English throughout. Findings and verdicts are derived from event metadata (kind, name, status, agent, attributes); the only prompt body ever loaded is your own, fetched from the sanitized payload to display it. It replays with the ingest watermark like the rest of the workbench.
+
+## What the prompt review checks
+
+[`apps/web/lib/workbench/prompt-review.ts`](apps/web/lib/workbench/prompt-review.ts) produces one finding per pattern, each with the events as evidence:
+
+| Finding                     | Trigger                                                                                 | What to change in the prompt                               |
+| --------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Missing tools (Fix)         | tool results that say "not found"                                                       | name the tools that exist, or drop that expectation        |
+| Prompt too thin (Improve)   | the orchestrator's task assignments are ≥3× the size of the prompt                      | write the deliverable, slices, constraints and stop rule   |
+| Poor spawn (Improve)        | a wave rated Marginal or Wasted                                                         | delegate only independent, heavy work                      |
+| Dominant wave (Note)        | one wave ≥60% of all delegated work                                                     | split side quests into their own prompt                    |
+| Overlapping lanes (Improve) | the same read/grep action in more than one lane (control tools such as `yield` ignored) | partition the work or share the context in each assignment |
+| Post-join assembly (Note)   | more than eight orchestrator turns after the last child joined                          | ask for a writeup or verifier agent                        |
+| Delegation paid off (Note)  | every wave rated Paid off                                                               | keep the structure                                         |
 
 ## How the optimizer decides
 
@@ -14,9 +29,9 @@ Both rules live in [`apps/web/lib/workbench/prompt-optimizer.ts`](apps/web/lib/w
 
 **Spawn now or hold (prospective).** A child lane is only worth its fresh context when the root lane shows an evidence gap or context pressure: tool failures (isolate the investigation), repeated identical tool calls (the root is looping), or more than six model turns already accumulated. The expected saving from those signals is compared with the cost of one child (fixed overhead plus a restated task). The verdict is always `Hold` while children are still running (wait for the join, do not double-spawn) and once the trace is complete.
 
-**Was that spawn worth it (retrospective).** For each `agent_handoff`, the child lanes' tool results and model turns are what stayed out of the parent's context; that volume is the saving. The children's fixed context plus their task assignments is the cost. Net ≥ cost is 值得, net ≥ 0 is 勉强, negative is 浪费, and a handoff with no child started yet is 等待中.
+**Was that spawn worth it (retrospective).** For each `agent_handoff`, the child lanes' tool results and model turns are what stayed out of the parent's context; that volume is the saving. The children's fixed context plus their task assignments is the cost. Net ≥ cost is Paid off, net ≥ 0 is Marginal, negative is Wasted, and a handoff with no child started yet is Pending.
 
-All token figures are floors estimated from event counts and name lengths (CJK counted at one token per character); they are for comparison, not billing.
+All token figures are floors estimated from event counts, name lengths and payload sizes (CJK counted at one token per character); they are for comparison, not billing.
 
 The derivation of the story (name parsing, FIFO result pairing inside a lane, step grouping) is in [`apps/web/lib/workbench/execution-story.ts`](apps/web/lib/workbench/execution-story.ts); the UI is [`apps/web/components/workbench/ExecutionStoryPanel.tsx`](apps/web/components/workbench/ExecutionStoryPanel.tsx).
 

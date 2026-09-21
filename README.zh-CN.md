@@ -4,9 +4,10 @@ HumanRL 是基于 [IntentTrace](https://github.com/chivier/IntentTrace) 搭的�
 
 - 每次 tool call 压成一行可读动作（`read ×4 · Reading parallel dispatch skill +3`），按 Agent lane 分组，结果自动配对，失败直接标出来。点一步展开单次调用，点单次调用跳到原始事件和证据；
 - 每次 spawn 子 Agent 单独成一步：谁派发了谁、为了什么、值不值；
-- **Prompt optimizer** 卡片回答“根 Agent 现在该不该 spawn”，只用不读 prompt 正文也能看到的信号；**spawn 账本**把已经发生的每次 spawn 评为 值得 / 勉强 / 浪费。
+- **Prompt review** 卡片显示你发的 prompt 和它导致了什么：agent 去调了不存在的工具、orchestrator 因为 prompt 没写清楚而自己补写了多少任务文本、哪一波占了大头预算、多个 lane 重复的工作、join 之后 orchestrator 自己做的组装。每条都有 "Show evidence" 直接打开原始事件；
+- **Prompt optimizer** 卡片回答“根 Agent 现在该不该 spawn”，只用不读 prompt 正文也能看到的信号；**spawn 账本**把已经发生的每次 spawn 评为 Paid off / Marginal / Wasted。
 
-整个视图不读初始 prompt，也不看任何隐藏推理，只从事件元数据（kind、name、status、agent、attributes）推出来，并且和工作台其他部分一样跟着 ingest watermark 回放。
+界面全部是英文。判断只从事件元数据（kind、name、status、agent、attributes）推出来；唯一会加载的 prompt 正文是你自己发的那条，从 sanitized payload 取来展示。整个面板和工作台其他部分一样跟着 ingest watermark 回放。
 
 ## 判断规则
 
@@ -14,11 +15,11 @@ HumanRL 是基于 [IntentTrace](https://github.com/chivier/IntentTrace) 搭的�
 
 **现在 spawn 还是 hold（前瞻）。** 只有根 lane 出现证据缺口或上下文压力时，子 Agent 的新上下文才划算：工具失败（把排查隔离出去）、重复的相同工具调用（根 Agent 在打转）、或者已经累计超过六轮 model call。这些信号折算的预计节省，和一个子 Agent 的成本（固定开销加一段任务复述）比大小。只要还有子 Agent 没 join，或者 trace 已经结束，结论一律是 `Hold`，不重复派发。
 
-**那次 spawn 值不值（回顾）。** 对每个 `agent_handoff`，子 lane 里的 tool result 和 model 轮次就是没进父 Agent 上下文的量，算作节省；子 Agent 的固定上下文加任务分配算作成本。净值 ≥ 成本是 值得，≥ 0 是 勉强，负数是 浪费，还没有子 Agent 启动的是 等待中。
+**那次 spawn 值不值（回顾）。** 对每个 `agent_handoff`，子 lane 里的 tool result 和 model 轮次就是没进父 Agent 上下文的量，算作节省；子 Agent 的固定上下文加任务分配算作成本。净值 ≥ 成本是 Paid off，≥ 0 是 Marginal，负数是 Wasted，还没有子 Agent 启动的是 Pending。
 
 所有 token 数都是按事件数和名字长度估的下限（中文按一字一 token），用来比大小，不是账单。
 
-故事本身的推导（名字解析、lane 内 FIFO 结果配对、分步合并）在 [`apps/web/lib/workbench/execution-story.ts`](apps/web/lib/workbench/execution-story.ts)，界面在 [`apps/web/components/workbench/ExecutionStoryPanel.tsx`](apps/web/components/workbench/ExecutionStoryPanel.tsx)。
+Prompt review 的七条检查规则见英文 README 里的表格，代码在 [`apps/web/lib/workbench/prompt-review.ts`](apps/web/lib/workbench/prompt-review.ts)。故事本身的推导（名字解析、lane 内 FIFO 结果配对、分步合并）在 [`apps/web/lib/workbench/execution-story.ts`](apps/web/lib/workbench/execution-story.ts)，界面在 [`apps/web/components/workbench/ExecutionStoryPanel.tsx`](apps/web/components/workbench/ExecutionStoryPanel.tsx)。
 
 ## 怎么跑
 

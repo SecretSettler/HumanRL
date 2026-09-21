@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { agentColor, laneOrderFor } from "@/lib/workbench/agent-colors";
 import {
@@ -16,13 +16,16 @@ import {
   type SpawnAccounting,
   type SpawnVerdict,
 } from "@/lib/workbench/prompt-optimizer";
+import { reviewPrompt, type PromptFinding } from "@/lib/workbench/prompt-review";
 import { useWorkbenchStore } from "@/lib/workbench/store";
+import { artifactUrl } from "@/lib/workbench/trace-api";
+import type { RawTraceEvent } from "@/lib/workbench/types";
 
 const VERDICT_LABEL: Record<SpawnVerdict, string> = {
-  worth: "值得",
-  marginal: "勉强",
-  wasteful: "浪费",
-  pending: "等待中",
+  worth: "Paid off",
+  marginal: "Marginal",
+  wasteful: "Wasted",
+  pending: "Pending",
 };
 
 const STATUS_GLYPH = { completed: "✓", failed: "!", running: "•" } as const;
@@ -61,7 +64,7 @@ function CallRow({ call, onSelect }: { call: StoryCall; onSelect: (eventId: stri
           <span className="block truncate text-meta text-ink">{call.action}</span>
           <span className="block truncate text-micro text-muted-2">
             #{call.event.ingestSeq}
-            {call.result ? ` → result #${call.result.ingestSeq}` : " → 还没有结果"}
+            {call.result ? ` → result #${call.result.ingestSeq}` : " → no result yet"}
             {call.status === "failed" && call.result
               ? ` · ${call.result.name.replace(/^Tool result: [^·]+·\s*/u, "")}`
               : ""}
@@ -121,7 +124,7 @@ function StepRow({
             <span className="mt-0.5 flex min-w-0 items-center gap-2 text-micro text-muted-2">
               <LaneDot color={color} name={step.agentId} />
               <span>#{step.seq}</span>
-              {failed > 0 ? <span className="text-red">{failed} 次失败</span> : null}
+              {failed > 0 ? <span className="text-red">{failed} failed</span> : null}
             </span>
           </span>
           <time className="execution-time">{time}</time>
@@ -149,7 +152,8 @@ function StepRow({
             <span className="flex min-w-0 items-baseline gap-2">
               <span className="execution-tool">spawn</span>
               <span className="truncate text-body text-ink">
-                {step.agentId} → {step.childAgentIds.length} 个子 Agent
+                {step.agentId} → {step.childAgentIds.length} child agent
+                {step.childAgentIds.length === 1 ? "" : "s"}
               </span>
               <span className={`spawn-verdict spawn-verdict--${verdict}`}>
                 {VERDICT_LABEL[verdict]}
@@ -158,7 +162,7 @@ function StepRow({
             <span className="mt-0.5 block truncate text-micro text-muted-2">
               {step.label} · {step.childAgentIds.join(", ")}
               {spawnAccount && spawnAccount.childrenStarted > 0
-                ? ` · 子 lane 吸收 ${spawnAccount.childToolResults} 次结果 / ${spawnAccount.childModelCalls} 轮`
+                ? ` · children absorbed ${spawnAccount.childToolResults} results / ${spawnAccount.childModelCalls} turns`
                 : ""}
             </span>
           </span>
@@ -177,7 +181,7 @@ function StepRow({
           </span>
           <span className="min-w-0">
             <span className="block truncate text-meta text-muted">
-              {step.agentId} 完成{step.joinedBy ? `，由 ${step.joinedBy} join` : ""}
+              {step.agentId} finished{step.joinedBy ? `, joined by ${step.joinedBy}` : ""}
             </span>
           </span>
           <time className="execution-time">{time}</time>
@@ -224,21 +228,21 @@ function SpawnCard({
       </span>
       <span className="mt-1 block truncate text-meta text-ink">{spawn.label}</span>
       <span className="mt-1 block text-micro text-muted-2">
-        {spawn.childAgentIds.length} 个子 Agent，{spawn.childrenJoined}/{spawn.childrenStarted} 已
-        join
-        {spawn.childFailures > 0 ? ` · ${spawn.childFailures} 次失败` : ""}
+        {spawn.childAgentIds.length} child agents, {spawn.childrenJoined}/{spawn.childrenStarted}{" "}
+        joined
+        {spawn.childFailures > 0 ? ` · ${spawn.childFailures} failed` : ""}
       </span>
       <span className="mt-1.5 grid grid-cols-3 gap-1 text-micro">
         <span className="spawn-figure">
-          <span>吸收</span>
+          <span>absorbed</span>
           <strong>≥{spawn.absorbedTokens}</strong>
         </span>
         <span className="spawn-figure">
-          <span>成本</span>
+          <span>cost</span>
           <strong>≥{spawn.spawnCostTokens}</strong>
         </span>
         <span className="spawn-figure">
-          <span>净</span>
+          <span>net</span>
           <strong className={spawn.netTokens >= 0 ? "text-green" : "text-red"}>
             {sign}
             {Math.abs(spawn.netTokens)}
@@ -246,6 +250,76 @@ function SpawnCard({
         </span>
       </span>
     </button>
+  );
+}
+
+/** The full prompt lives in the sanitized payload; the event name only carries a 240-character preview. */
+function usePromptText(traceId: string | null, event: RawTraceEvent | null): string | null {
+  const [text, setText] = useState<string | null>(null);
+  useEffect(() => {
+    setText(null);
+    if (!traceId || !event?.payloadRef) return;
+    const controller = new AbortController();
+    void fetch(artifactUrl(traceId, event.payloadRef.artifactId, event.payloadRef.byteLength), {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => (response.ok ? response.text() : null))
+      .then((body) => {
+        if (body === null || controller.signal.aborted) return;
+        try {
+          const parsed = JSON.parse(body) as { text?: unknown };
+          setText(typeof parsed.text === "string" ? parsed.text : body);
+        } catch {
+          setText(body);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [event, traceId]);
+  return text;
+}
+
+const SEVERITY_LABEL = { high: "Fix", medium: "Improve", info: "Note" } as const;
+
+function FindingRow({
+  finding,
+  onSelect,
+}: {
+  finding: PromptFinding;
+  onSelect: (eventId: string) => void;
+}) {
+  const [open, setOpen] = useState(finding.severity !== "info");
+  const first = finding.eventIds[0];
+  return (
+    <li className={`finding finding--${finding.severity}`}>
+      <button
+        type="button"
+        className="finding__button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className={`finding__badge finding__badge--${finding.severity}`}>
+          {SEVERITY_LABEL[finding.severity]}
+        </span>
+        <span className="min-w-0 text-meta text-ink">{finding.title}</span>
+      </button>
+      {open ? (
+        <div className="finding__body">
+          <p className="m-0 text-meta text-muted">{finding.detail}</p>
+          <p className="m-0 mt-1.5 text-meta text-ink">
+            <span className="text-muted-2">Next time: </span>
+            {finding.suggestion}
+          </p>
+          {first ? (
+            <button type="button" className="finding__evidence" onClick={() => onSelect(first)}>
+              Show evidence ({finding.eventIds.length} event
+              {finding.eventIds.length === 1 ? "" : "s"})
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
   );
 }
 
@@ -263,6 +337,12 @@ export function ExecutionStoryPanel() {
   const steps = useMemo(() => buildExecutionStory(events), [events]);
   const totals = useMemo(() => storyTotals(steps), [steps]);
   const decision = useMemo(() => evaluatePromptOptimization({ events }), [events]);
+  const review = useMemo(
+    () => reviewPrompt({ events, optimization: decision }),
+    [decision, events],
+  );
+  const promptText = usePromptText(snapshot?.trace.id ?? null, review.promptEvent);
+  const [promptOpen, setPromptOpen] = useState(false);
   const spawnByEvent = useMemo(
     () => new Map(decision.spawns.map((spawn) => [spawn.handoffEventId, spawn] as const)),
     [decision.spawns],
@@ -300,7 +380,7 @@ export function ExecutionStoryPanel() {
             Execution story
           </p>
           <h2 className="m-0 mt-0.5 text-title font-semibold">
-            每个 tool call 做了什么，什么时候 spawn 了子 Agent
+            What every tool call did, and where subagents were spawned
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -314,7 +394,7 @@ export function ExecutionStoryPanel() {
             aria-expanded={!collapsed}
             onClick={() => setCollapsed((value) => !value)}
           >
-            {collapsed ? "展开" : "收起"}
+            {collapsed ? "Expand" : "Collapse"}
           </button>
         </div>
       </header>
@@ -324,7 +404,7 @@ export function ExecutionStoryPanel() {
           <ol className="execution-steps" aria-label="Tool call timeline">
             {steps.length === 0 ? (
               <li className="rounded-lg border border-dashed border-line px-3 py-3 text-meta text-muted-2">
-                当前 watermark 还没有工具动作。
+                No tool activity at this watermark yet.
               </li>
             ) : (
               steps.map((step) => (
@@ -347,10 +427,58 @@ export function ExecutionStoryPanel() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="m-0 text-micro font-bold uppercase tracking-[0.14em] text-muted-2">
+                    Prompt review
+                  </p>
+                  <h3 className="m-0 mt-0.5 text-meta font-semibold text-ink">
+                    What your prompt caused in this run
+                  </h3>
+                </div>
+                {review.promptEvent ? (
+                  <span className="rounded-full border border-line bg-panel-3 px-2 py-0.5 text-micro text-muted">
+                    ~{review.promptTokens} tok
+                  </span>
+                ) : null}
+              </div>
+              {review.promptEvent ? (
+                <button
+                  type="button"
+                  className="prompt-text"
+                  aria-expanded={promptOpen}
+                  onClick={() => setPromptOpen((value) => !value)}
+                >
+                  <span className={promptOpen ? "" : "prompt-text__clamp"}>
+                    {promptText ?? review.promptPreview}
+                  </span>
+                  <span className="mt-1 block text-micro text-muted-2">
+                    {promptOpen ? "Collapse" : "Show full prompt"} · #{review.promptEvent.ingestSeq}{" "}
+                    · {review.promptEvent.agentId}
+                  </span>
+                </button>
+              ) : (
+                <p className="m-0 mt-2 text-meta text-muted-2">No user prompt at this watermark.</p>
+              )}
+              {review.findings.length > 0 ? (
+                <ul className="findings">
+                  {review.findings.map((finding) => (
+                    <FindingRow key={finding.id} finding={finding} onSelect={select} />
+                  ))}
+                </ul>
+              ) : review.promptEvent ? (
+                <p className="m-0 mt-2 text-meta text-muted-2">
+                  Nothing to flag yet; findings appear as the run produces failures, spawns or
+                  repeated work.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="rounded-lg border border-line bg-[#0d1118] p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="m-0 text-micro font-bold uppercase tracking-[0.14em] text-muted-2">
                     Prompt optimizer
                   </p>
                   <h3 className="m-0 mt-0.5 text-meta font-semibold text-ink">
-                    现在该不该再 spawn？
+                    Should the root agent spawn now?
                   </h3>
                 </div>
                 <span className={`prompt-decision prompt-decision--${decision.decision}`}>
@@ -359,21 +487,21 @@ export function ExecutionStoryPanel() {
               </div>
               <div className="mt-2.5 grid grid-cols-2 gap-1.5">
                 <div className="metric-card">
-                  <span>根 lane 轮数</span>
+                  <span>root turns</span>
                   <strong>{decision.contextPressure}</strong>
                 </div>
                 <div className="metric-card">
-                  <span>失败 / 重复</span>
+                  <span>failed / repeated</span>
                   <strong>
                     {decision.toolFailures} / {decision.repeatedToolCalls}
                   </strong>
                 </div>
                 <div className="metric-card">
-                  <span>预计节省</span>
+                  <span>expected saving</span>
                   <strong>≥{decision.expectedSavedTokens} tok</strong>
                 </div>
                 <div className="metric-card">
-                  <span>一次 spawn 成本</span>
+                  <span>one spawn costs</span>
                   <strong>≥{decision.spawnCostTokens} tok</strong>
                 </div>
               </div>
@@ -383,15 +511,15 @@ export function ExecutionStoryPanel() {
                 ))}
               </ul>
               <p className="m-0 mt-2.5 text-micro text-muted-2">
-                只看事件元数据，不读 prompt 正文。token
-                数是按名字长度和事件数估的下限，用来比大小，不是账单。
+                Event metadata only; the prompt body is never read. Token figures are floors
+                estimated from names and event counts, for comparison, not billing.
               </p>
             </div>
 
             {decision.spawns.length > 0 ? (
               <div className="grid gap-1.5">
                 <p className="m-0 text-micro font-bold uppercase tracking-[0.14em] text-muted-2">
-                  已发生的 spawn · 值不值
+                  Spawn ledger · did each wave pay off?
                 </p>
                 {decision.spawns.map((spawn) => (
                   <SpawnCard

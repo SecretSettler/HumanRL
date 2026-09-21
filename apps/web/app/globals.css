@@ -455,6 +455,98 @@ button:disabled {
   color: var(--color-ink);
   font-variant-numeric: tabular-nums;
 }
+.prompt-text {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: rgb(89 182 255 / 5%);
+  color: var(--color-ink);
+  font-size: var(--text-meta);
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.prompt-text:hover {
+  background: rgb(89 182 255 / 9%);
+}
+.prompt-text__clamp {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+.findings {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.finding {
+  border: 1px solid var(--color-line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: rgb(21 26 35 / 70%);
+}
+.finding--high {
+  border-left-color: var(--color-red);
+}
+.finding--medium {
+  border-left-color: var(--color-amber);
+}
+.finding--info {
+  border-left-color: var(--color-accent-2);
+}
+.finding__button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+.finding__button:hover {
+  background: transparent;
+  border-color: transparent;
+}
+.finding__badge {
+  flex: none;
+  margin-top: 1px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.finding__badge--high {
+  color: var(--color-red);
+  background: rgb(255 115 115 / 12%);
+}
+.finding__badge--medium {
+  color: var(--color-amber);
+  background: rgb(241 185 91 / 12%);
+}
+.finding__badge--info {
+  color: var(--color-accent-2);
+  background: rgb(89 182 255 / 12%);
+}
+.finding__body {
+  padding: 0 9px 8px 9px;
+}
+.finding__evidence {
+  margin-top: 6px;
+  padding: 3px 8px;
+  font-size: var(--text-micro);
+}
 .metric-card {
   display: grid;
   gap: 3px;
