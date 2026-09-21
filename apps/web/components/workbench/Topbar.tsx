@@ -71,11 +71,7 @@ export function Topbar({ traceId }: { traceId: string }) {
 
   return (
     <header className="flex items-center gap-4 border-b border-line bg-bg/88 px-4 backdrop-blur-md">
-      <Link
-        href="/"
-        className="flex items-center gap-2.5 no-underline"
-        aria-label="IntentTrace home"
-      >
+      <Link href="/" className="flex items-center gap-2.5 no-underline" aria-label="HumanRL home">
         <span
           aria-hidden
           className="grid size-[30px] place-items-center rounded-[9px] bg-[conic-gradient(from_180deg,#8b7cf6,#59b6ff,#49d6d0,#8b7cf6)] p-[2px]"
@@ -85,8 +81,8 @@ export function Topbar({ traceId }: { traceId: string }) {
           </span>
         </span>
         <span className="leading-tight">
-          <span className="block text-title font-bold text-ink">IntentTrace</span>
-          <span className="block text-micro text-muted-2">Evidence-backed agent traces</span>
+          <span className="block text-title font-bold text-ink">HumanRL</span>
+          <span className="block text-micro text-muted-2">Readable agent traces</span>
         </span>
       </Link>
       <Link href="/import" className="ui-button ui-button--ghost">

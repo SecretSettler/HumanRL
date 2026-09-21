@@ -23,8 +23,8 @@ export function AppHeader() {
         </span>
       </span>
       <div className="leading-tight">
-        <h1 className="m-0 text-lead font-bold tracking-tight">IntentTrace</h1>
-        <p className="m-0 text-micro text-muted-2">Evidence-backed agent traces</p>
+        <h1 className="m-0 text-lead font-bold tracking-tight">HumanRL</h1>
+        <p className="m-0 text-micro text-muted-2">Readable traces for human review</p>
       </div>
       <nav aria-label="Sections" className="ml-4 flex items-center gap-1">
         {sections.map((section) => {

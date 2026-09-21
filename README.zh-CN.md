@@ -1,4 +1,43 @@
-# IntentTrace
+# HumanRL
+
+HumanRL 是基于 [IntentTrace](https://github.com/chivier/IntentTrace) 搭的本地 trace 工作台。它保留 IntentTrace 的只追加事件、Intent Graph、Agent Gantt、replay watermark 和 Evidence Inspector，并在每条 trace 上面加了一块 **Execution story** 面板：
+
+- 每次 tool call 压成一行可读动作（`read ×4 · Reading parallel dispatch skill +3`），按 Agent lane 分组，结果自动配对，失败直接标出来。点一步展开单次调用，点单次调用跳到原始事件和证据；
+- 每次 spawn 子 Agent 单独成一步：谁派发了谁、为了什么、值不值；
+- **Prompt optimizer** 卡片回答“根 Agent 现在该不该 spawn”，只用不读 prompt 正文也能看到的信号；**spawn 账本**把已经发生的每次 spawn 评为 值得 / 勉强 / 浪费。
+
+整个视图不读初始 prompt，也不看任何隐藏推理，只从事件元数据（kind、name、status、agent、attributes）推出来，并且和工作台其他部分一样跟着 ingest watermark 回放。
+
+## 判断规则
+
+两条规则都在 [`apps/web/lib/workbench/prompt-optimizer.ts`](apps/web/lib/workbench/prompt-optimizer.ts)，用和真实 fixture 同形状的事件做了单元测试。
+
+**现在 spawn 还是 hold（前瞻）。** 只有根 lane 出现证据缺口或上下文压力时，子 Agent 的新上下文才划算：工具失败（把排查隔离出去）、重复的相同工具调用（根 Agent 在打转）、或者已经累计超过六轮 model call。这些信号折算的预计节省，和一个子 Agent 的成本（固定开销加一段任务复述）比大小。只要还有子 Agent 没 join，或者 trace 已经结束，结论一律是 `Hold`，不重复派发。
+
+**那次 spawn 值不值（回顾）。** 对每个 `agent_handoff`，子 lane 里的 tool result 和 model 轮次就是没进父 Agent 上下文的量，算作节省；子 Agent 的固定上下文加任务分配算作成本。净值 ≥ 成本是 值得，≥ 0 是 勉强，负数是 浪费，还没有子 Agent 启动的是 等待中。
+
+所有 token 数都是按事件数和名字长度估的下限（中文按一字一 token），用来比大小，不是账单。
+
+故事本身的推导（名字解析、lane 内 FIFO 结果配对、分步合并）在 [`apps/web/lib/workbench/execution-story.ts`](apps/web/lib/workbench/execution-story.ts)，界面在 [`apps/web/components/workbench/ExecutionStoryPanel.tsx`](apps/web/components/workbench/ExecutionStoryPanel.tsx)。
+
+## 怎么跑
+
+下面的 Docker 路径（`pnpm docker:up`、`pnpm demo:load`）没有变。要在宿主机直接跑，先在 `127.0.0.1:15432` 起一个 PostgreSQL，建好 `intenttrace/intenttrace` 角色和库，然后：
+
+```bash
+corepack pnpm install --frozen-lockfile
+corepack pnpm --filter './packages/*' build
+set -a; source .env.example; set +a
+corepack pnpm --filter @intenttrace/db migrate
+corepack pnpm --filter @intenttrace/api dev &
+corepack pnpm --filter @intenttrace/worker dev &
+corepack pnpm --filter @intenttrace/web dev --hostname 127.0.0.1 --port 3000 &
+INTENTTRACE_WEB_ORIGIN=http://127.0.0.1:3000 corepack pnpm demo:load
+```
+
+然后打开 `http://127.0.0.1:3000/traces`，选那条九 lane 的 IMO 录制 trace。下面是 IntentTrace 原有的 README。
+
+---
 
 [English](README.md) | 简体中文
 

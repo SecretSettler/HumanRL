@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import { Banner } from "@intenttrace/ui";
 
+import { ExecutionStoryPanel } from "@/components/workbench/ExecutionStoryPanel";
 import { Topbar } from "@/components/workbench/Topbar";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { GanttPanel } from "@/components/workbench/gantt/GanttPanel";
@@ -94,6 +95,7 @@ export function TraceWorkbench({ traceId }: { traceId: string }) {
         </Banner>
       ) : null}
       <SummaryStrip />
+      <ExecutionStoryPanel />
       <section
         className="m-2 grid grid-cols-[260px_1fr_auto] items-center gap-4 rounded-xl border border-line bg-panel px-3 py-2 max-[1023px]:grid-cols-1"
         aria-label="Replay controls"

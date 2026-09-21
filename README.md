@@ -1,4 +1,43 @@
-# IntentTrace
+# HumanRL
+
+HumanRL is a local trace workbench built on [IntentTrace](https://github.com/chivier/IntentTrace). It keeps IntentTrace's append-only events, Intent Graph, Agent Gantt, replay watermark and Evidence Inspector, and adds an **Execution story** panel on top of every trace:
+
+- every tool call is turned into one readable line (`read ×4 · Reading parallel dispatch skill +3`), grouped per agent lane, with its result paired and its failure surfaced. Click a step to expand the individual calls; click a call to jump to the raw event and its evidence;
+- every subagent spawn is a step of its own: who dispatched whom, what for, and whether it paid off;
+- a **Prompt optimizer** card answers "should the root agent spawn now?" from signals visible without the prompt body, and a **spawn ledger** rates each spawn that already happened as 值得 / 勉强 / 浪费.
+
+Nothing here reads the initial prompt or any hidden reasoning; the whole view is derived from event metadata (kind, name, status, agent, attributes). It replays with the ingest watermark like the rest of the workbench.
+
+## How the optimizer decides
+
+Both rules live in [`apps/web/lib/workbench/prompt-optimizer.ts`](apps/web/lib/workbench/prompt-optimizer.ts) and are unit-tested against fixture-shaped events.
+
+**Spawn now or hold (prospective).** A child lane is only worth its fresh context when the root lane shows an evidence gap or context pressure: tool failures (isolate the investigation), repeated identical tool calls (the root is looping), or more than six model turns already accumulated. The expected saving from those signals is compared with the cost of one child (fixed overhead plus a restated task). The verdict is always `Hold` while children are still running (wait for the join, do not double-spawn) and once the trace is complete.
+
+**Was that spawn worth it (retrospective).** For each `agent_handoff`, the child lanes' tool results and model turns are what stayed out of the parent's context; that volume is the saving. The children's fixed context plus their task assignments is the cost. Net ≥ cost is 值得, net ≥ 0 is 勉强, negative is 浪费, and a handoff with no child started yet is 等待中.
+
+All token figures are floors estimated from event counts and name lengths (CJK counted at one token per character); they are for comparison, not billing.
+
+The derivation of the story (name parsing, FIFO result pairing inside a lane, step grouping) is in [`apps/web/lib/workbench/execution-story.ts`](apps/web/lib/workbench/execution-story.ts); the UI is [`apps/web/components/workbench/ExecutionStoryPanel.tsx`](apps/web/components/workbench/ExecutionStoryPanel.tsx).
+
+## Running it
+
+The Docker path below (`pnpm docker:up`, `pnpm demo:load`) is unchanged. To run on the host instead, start a PostgreSQL on `127.0.0.1:15432` with the `intenttrace/intenttrace` role and database, then:
+
+```bash
+corepack pnpm install --frozen-lockfile
+corepack pnpm --filter './packages/*' build
+set -a; source .env.example; set +a
+corepack pnpm --filter @intenttrace/db migrate
+corepack pnpm --filter @intenttrace/api dev &
+corepack pnpm --filter @intenttrace/worker dev &
+corepack pnpm --filter @intenttrace/web dev --hostname 127.0.0.1 --port 3000 &
+INTENTTRACE_WEB_ORIGIN=http://127.0.0.1:3000 corepack pnpm demo:load
+```
+
+Then open `http://127.0.0.1:3000/traces` and pick the recorded nine-lane IMO trace. IntentTrace's own README follows.
+
+---
 
 English | [简体中文](README.zh-CN.md)
 
