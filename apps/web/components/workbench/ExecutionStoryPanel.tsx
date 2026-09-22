@@ -190,17 +190,30 @@ function StepRow({
     );
   }
 
+  const assistant = step.role === "assistant";
   return (
-    <li className="execution-step execution-step--message" style={{ borderLeftColor: color }}>
+    <li
+      className={`execution-step ${assistant ? "execution-step--assistant" : "execution-step--message"}`}
+      style={{ borderLeftColor: color }}
+    >
       <button type="button" className="execution-step__button" onClick={() => onSelect(step.id)}>
-        <span className="execution-icon execution-icon--message" aria-hidden>
-          ▸
+        <span
+          className={`execution-icon ${assistant ? "execution-icon--join" : "execution-icon--message"}`}
+          aria-hidden
+        >
+          {assistant ? "…" : "▸"}
         </span>
         <span className="min-w-0">
           <span className="block text-micro font-bold uppercase tracking-[0.12em] text-muted-2">
-            {step.label} · {step.agentId}
+            {assistant ? "Agent said" : step.label} · {step.agentId}
           </span>
-          <span className="execution-message">{step.text}</span>
+          <span
+            className={
+              assistant ? "execution-message execution-message--quiet" : "execution-message"
+            }
+          >
+            {step.text}
+          </span>
         </span>
         <time className="execution-time">{time}</time>
       </button>
@@ -253,6 +266,31 @@ function SpawnCard({
   );
 }
 
+/**
+ * Pull the human-readable text out of a sanitized message payload. Canonical
+ * JSONL stores `{"text": …}`; Codex stores the response item with
+ * `payload.content[].text`; anything else is shown as is.
+ */
+export function extractMessageText(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    if (typeof parsed.text === "string") return parsed.text;
+    const payload = (parsed.payload ?? parsed) as Record<string, unknown>;
+    const content = payload.content;
+    if (Array.isArray(content)) {
+      const parts = content
+        .map((part) =>
+          part && typeof part === "object" ? (part as { text?: unknown }).text : null,
+        )
+        .filter((text): text is string => typeof text === "string" && text.trim().length > 0);
+      if (parts.length > 0) return parts.join("\n\n");
+    }
+    return body;
+  } catch {
+    return body;
+  }
+}
+
 /** The full prompt lives in the sanitized payload; the event name only carries a 240-character preview. */
 function usePromptText(traceId: string | null, event: RawTraceEvent | null): string | null {
   const [text, setText] = useState<string | null>(null);
@@ -267,12 +305,7 @@ function usePromptText(traceId: string | null, event: RawTraceEvent | null): str
       .then(async (response) => (response.ok ? response.text() : null))
       .then((body) => {
         if (body === null || controller.signal.aborted) return;
-        try {
-          const parsed = JSON.parse(body) as { text?: unknown };
-          setText(typeof parsed.text === "string" ? parsed.text : body);
-        } catch {
-          setText(body);
-        }
+        setText(extractMessageText(body));
       })
       .catch(() => {});
     return () => controller.abort();

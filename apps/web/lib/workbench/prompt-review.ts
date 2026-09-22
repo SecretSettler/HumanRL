@@ -1,7 +1,8 @@
-import { TOOL_CALL_KINDS, splitName, toolNameOf } from "./execution-story";
+import { TOOL_CALL_KINDS, firstUserPrompt, splitName, toolNameOf } from "./execution-story";
 import {
   promptTokensOf,
   rootAgentOf,
+  turnEvents,
   type PromptOptimizationResult,
   type SpawnAccounting,
 } from "./prompt-optimizer";
@@ -40,6 +41,8 @@ const PLANNING_TURNS_THRESHOLD = 3;
 const SHORT_PROMPT_TOKENS = 60;
 /** More post-join turns than this means the orchestrator did the assembly itself. */
 const POST_JOIN_TURNS_THRESHOLD = 8;
+/** A run with this many root tool calls and no subagent is worth a note about delegation. */
+const UNDELEGATED_CALLS_THRESHOLD = 20;
 /** One wave taking more than this share of all absorbed work dominates the run. */
 const DOMINANT_WAVE_SHARE = 0.6;
 /** Task assignments this many times larger than the prompt mean the orchestrator wrote the task. */
@@ -81,9 +84,7 @@ export function reviewPrompt({
 }): PromptReview {
   const ordered = [...events].sort((a, b) => seqOf(a) - seqOf(b));
   const rootAgentId = rootAgentOf(ordered);
-  const promptEvent =
-    ordered.find((event) => event.kind === "user_message" && !stringAttr(event, "assignedBy")) ??
-    null;
+  const promptEvent = firstUserPrompt(ordered);
   const promptPreview = promptEvent ? (splitName(promptEvent.name).detail ?? promptEvent.name) : "";
   const promptTokens = promptEvent ? promptTokensOf(promptEvent) : 0;
   const findings: PromptFinding[] = [];
@@ -124,9 +125,8 @@ export function reviewPrompt({
   }
 
   // 2. A short prompt the orchestrator had to turn into a task itself.
-  const planningTurns = rootLane.filter(
-    (event) => event.kind === "model_call" && seqOf(event) < firstSpawnSeq,
-  );
+  const rootTurns = turnEvents(rootLane);
+  const planningTurns = rootTurns.filter((event) => seqOf(event) < firstSpawnSeq);
   const planningReads = rootLane.filter(
     (event) => TOOL_CALL_KINDS.has(event.kind) && seqOf(event) < firstSpawnSeq,
   );
@@ -238,9 +238,7 @@ export function reviewPrompt({
     0,
     ...ordered.filter((event) => event.kind === "agent_end").map(seqOf),
   );
-  const postJoinTurns = rootLane.filter(
-    (event) => event.kind === "model_call" && seqOf(event) > lastJoinSeq,
-  );
+  const postJoinTurns = rootTurns.filter((event) => seqOf(event) > lastJoinSeq);
   if (lastJoinSeq > 0 && postJoinTurns.length > POST_JOIN_TURNS_THRESHOLD) {
     findings.push({
       id: "post-join-assembly",
@@ -254,7 +252,22 @@ export function reviewPrompt({
     });
   }
 
-  // 7. Positive confirmation when dispatch worked.
+  // 7. No delegation at all in a long single-context run.
+  const rootCalls = rootLane.filter((event) => TOOL_CALL_KINDS.has(event.kind));
+  const rootResults = rootLane.filter((event) => event.kind === "tool_result");
+  if (spawns.length === 0 && rootCalls.length >= UNDELEGATED_CALLS_THRESHOLD) {
+    findings.push({
+      id: "no-delegation",
+      severity: "info",
+      title: `Everything ran in one context: ${plural(rootCalls.length, "tool call")}, ${plural(rootTurns.length, "turn")}, no subagent`,
+      detail: `${plural(rootResults.length, "tool result")} landed in the main context. Where the reads were independent (different repos, directories or questions), a scout per area would have kept its results out of that context.`,
+      suggestion:
+        "If the task has independent parts, say so and ask for a subagent per part; the ledger above shows what each wave saves once it exists.",
+      eventIds: rootCalls.map((event) => event.id),
+    });
+  }
+
+  // 8. Positive confirmation when dispatch worked.
   if (spawns.length > 0 && poor.length === 0) {
     const net = spawns.reduce((sum, spawn) => sum + spawn.netTokens, 0);
     findings.push({

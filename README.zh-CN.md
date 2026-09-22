@@ -1,34 +1,87 @@
 # HumanRL
 
-HumanRL 是基于 [IntentTrace](https://github.com/chivier/IntentTrace) 搭的本地 trace 工作台。它保留 IntentTrace 的只追加事件、Intent Graph、Agent Gantt、replay watermark 和 Evidence Inspector，并在每条 trace 上面加了一块 **Execution story** 面板：
+**我的 prompt 写得行不行？** HumanRL 从 agent 留下的 trace 里回答这个问题。把一个 Codex 或 Claude 的 session（或自带的 demo）指给它，它会用英文平铺直叙地告诉你：每次 tool call 干了什么、agent 在哪里 spawn 了子 agent、每次 spawn 值不值那些 token、以及你 prompt 里的哪句话造成了浪费。
 
-- 每次 tool call 压成一行可读动作（`read ×4 · Reading parallel dispatch skill +3`），按 Agent lane 分组，结果自动配对，失败直接标出来。点一步展开单次调用，点单次调用跳到原始事件和证据；
-- 每次 spawn 子 Agent 单独成一步：谁派发了谁、为了什么、值不值；
-- **Prompt review** 卡片显示你发的 prompt 和它导致了什么：agent 去调了不存在的工具、orchestrator 因为 prompt 没写清楚而自己补写了多少任务文本、哪一波占了大头预算、多个 lane 重复的工作、join 之后 orchestrator 自己做的组装。每条都有 "Show evidence" 直接打开原始事件；
-- **Prompt optimizer** 卡片回答“根 Agent 现在该不该 spawn”，只用不读 prompt 正文也能看到的信号；**spawn 账本**把已经发生的每次 spawn 评为 Paid off / Marginal / Wasted。
+它建在 [IntentTrace](https://github.com/chivier/IntentTrace) 上，保留 IntentTrace 的全部功能（只追加的 raw event、Intent Graph、Agent Gantt、回放滑块、Evidence Inspector），数据不出本机。
 
-界面全部是英文。判断只从事件元数据（kind、name、status、agent、attributes）推出来；唯一会加载的 prompt 正文是你自己发的那条，从 sanitized payload 取来展示。整个面板和工作台其他部分一样跟着 ingest watermark 回放。
+![HumanRL 打开自带的九 lane IMO demo：左边 Execution story，右边带证据的 Prompt review](docs/assets/humanrl-demo.png)
+
+## 一条命令
+
+```bash
+git clone https://github.com/SecretSettler/HumanRL.git && cd HumanRL
+corepack enable && corepack pnpm install --frozen-lockfile
+corepack pnpm humanrl:up
+```
+
+`humanrl:up` 会起 PostgreSQL、跑迁移、启动 api / worker / web、灌入 demo trace、打印地址并打开浏览器。装了 Docker Compose 就跑 IntentTrace 自带的容器栈；没装（没有 compose 插件，或者 Docker 磁盘满了）就在宿主机直接跑，PostgreSQL 依次尝试 `docker run`、Homebrew 的 `postgresql@17`、已有的 `DATABASE_URL`。`pnpm humanrl:down` 停掉它起的所有东西，`pnpm humanrl:status` 看状态，日志在 `.intenttrace/logs/`。
+
+需要 Node 24（22 能跑，只有 warning）和 Corepack 管理的 pnpm 11。
+
+## 导入你自己的 session
+
+```bash
+# 这台机器上最近一次 Codex session
+pnpm humanrl:import -- --source codex --path ~/.codex/sessions --newest --max-files 1
+
+# 最近三次 Claude Code session
+pnpm humanrl:import -- --source claude --path ~/.claude/projects --newest --max-files 3
+
+# 或者手选：先列出来，复制 id，再导入
+pnpm humanrl:import -- discover --source codex --path ~/.codex/sessions --limit 20
+pnpm humanrl:import -- --source codex --path ~/.codex/sessions --session <24 位 id>
+```
+
+然后打开 `http://127.0.0.1:3000/traces` 选那条 trace。浏览器里的 `/import` 页面拖拽文件也一样。导入时会剥掉隐藏推理、加密内容和主机路径再落库。
+
+## 页面怎么看
+
+**Execution story**（左）是一条从上往下读的运行记录：
+
+- `▸ User request` 是你的 prompt，`… Agent said` 是 agent 在动作之间跟你说的话。
+- `✓ read ×4 · Reading parallel dispatch skill +3` 是一个 agent 连续用同一个工具四次。点一下展开四次调用，再点单次调用，右边 Evidence Inspector 打开它的原始事件和 sanitized payload。`!` 表示失败。
+- `⑂ spawn · Orchestrator → 3 child agents · Paid off` 是一次派发子 agent，带结论。
+- `⇤ ImoBruteForce finished, joined by Orchestrator` 是子 agent 回来了。
+- 左边框颜色是 agent 的 lane，和下面 Gantt 同色。
+
+**Prompt review**（右上）显示你发的 prompt 和它造成的每一件事。`Fix` 是白花的钱，`Improve` 是习惯问题，`Note` 是背景信息。每条都有 **Show evidence**，直接打开背后的原始事件。
+
+**Prompt optimizer** 回答“在当前回放位置，根 agent 现在该不该 spawn”，**spawn ledger** 给已经发生的每次 spawn 打分。拖面板下面的 watermark 滑块，整个面板跟着回放：第一次 spawn 之前是 Hold（没信号），中途是 Hold（子 agent 还没回来），结束后是复盘。
+
+## 两个真实的例子
+
+**自带的 demo** 是一次录下来的运行：orchestrator 用八个并行子 agent 解 IMO 2025 P1（691 事件，9 个 lane）。prompt 只有一句中文：“帮我使用 subagent 解决一个 IMO bench 中的数学题，注意一定要使用 skill + subagent 并发，让 trace 真实且复杂。” review 给出：
+
+|         | 发现                                                                            | 对 prompt 意味着什么                                                                                      |
+| ------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Fix     | agent 去调了 3 个不存在的工具：`eval`、`write`、`bash`（2 个 lane 里 5 次失败） | prompt 暗示要机器验证，环境里没有代码运行器。写清楚有哪些工具。                                           |
+| Improve | prompt 约 69 token，orchestrator 自己写了约 2400 token 的任务分配来补它没说的   | Show evidence 打开 #29：交付路径、切片、约束、停止条件全是 orchestrator 编的。那段文字才是该发的 prompt。 |
+| Note    | 78% 的委派工作给了 "Scouting UI, ingest, docs conventions"                      | prompt 第一句关于截图的话把八个 agent 里的三个拉去看仓库而不是做数学。支线该单独开一个 prompt。           |
+| Improve | 4 个动作在多个 lane 重复                                                        | 两个 scout 都读了截图脚本，切片有重叠。                                                                   |
+| Note    | 最后一个子 agent 回来后 orchestrator 又跑了 14 轮                               | 组装发生在它最重的上下文里。                                                                              |
+| Note    | 委派值回票价：3 波、8 个 agent，净省 ≥41k token 没进 orchestrator 上下文        | 并行结构本身是对的。                                                                                      |
+
+**搭这个仓库的那次 Codex session**（用上面的命令导入）是另一种运行：单 agent、没有子 agent、45 次 `exec`。故事压成“用户提问 → agent 说打算怎么做 → 8 条命令 → agent 汇报 → 14 条命令 → …”，每次 `exec` 显示它跑的 shell 命令而不是 Codex 记录的 JavaScript 外壳。review 只有一条 note：_Everything ran in one context: 45 tool calls, 48 turns, no subagent_，指出两个仓库的阅读是独立的，一个仓库一个 scout 就能把那些输出挡在主上下文外。
+
+![导入的 Codex session：单 lane，命令已摘要，没有委派](docs/assets/humanrl-codex-session.png)
 
 ## 判断规则
 
-两条规则都在 [`apps/web/lib/workbench/prompt-optimizer.ts`](apps/web/lib/workbench/prompt-optimizer.ts)，用和真实 fixture 同形状的事件做了单元测试。
+Prompt review 的八条检查规则见英文 README 里的表格，代码在 [`apps/web/lib/workbench/prompt-review.ts`](apps/web/lib/workbench/prompt-review.ts)。优化器的两条规则在 [`apps/web/lib/workbench/prompt-optimizer.ts`](apps/web/lib/workbench/prompt-optimizer.ts)：
 
 **现在 spawn 还是 hold（前瞻）。** 只有根 lane 出现证据缺口或上下文压力时，子 Agent 的新上下文才划算：工具失败（把排查隔离出去）、重复的相同工具调用（根 Agent 在打转）、或者已经累计超过六轮 model call。这些信号折算的预计节省，和一个子 Agent 的成本（固定开销加一段任务复述）比大小。只要还有子 Agent 没 join，或者 trace 已经结束，结论一律是 `Hold`，不重复派发。
 
 **那次 spawn 值不值（回顾）。** 对每个 `agent_handoff`，子 lane 里的 tool result 和 model 轮次就是没进父 Agent 上下文的量，算作节省；子 Agent 的固定上下文加任务分配算作成本。净值 ≥ 成本是 Paid off，≥ 0 是 Marginal，负数是 Wasted，还没有子 Agent 启动的是 Pending。
 
-所有 token 数都是按事件数和名字长度估的下限（中文按一字一 token），用来比大小，不是账单。
+所有 token 数都是按事件数、名字长度和 payload 大小估的下限（中文按一字一 token），用来比大小，不是账单。没有 `model_call` 事件的 adapter（Codex）用 agent 的叙述加 tool call 数当轮数。故事本身的推导在 [`apps/web/lib/workbench/execution-story.ts`](apps/web/lib/workbench/execution-story.ts)，界面在 [`apps/web/components/workbench/ExecutionStoryPanel.tsx`](apps/web/components/workbench/ExecutionStoryPanel.tsx)。
 
-Prompt review 的七条检查规则见英文 README 里的表格，代码在 [`apps/web/lib/workbench/prompt-review.ts`](apps/web/lib/workbench/prompt-review.ts)。故事本身的推导（名字解析、lane 内 FIFO 结果配对、分步合并）在 [`apps/web/lib/workbench/execution-story.ts`](apps/web/lib/workbench/execution-story.ts)，界面在 [`apps/web/components/workbench/ExecutionStoryPanel.tsx`](apps/web/components/workbench/ExecutionStoryPanel.tsx)。
+## 手动跑
 
-## 怎么跑
-
-下面的 Docker 路径（`pnpm docker:up`、`pnpm demo:load`）没有变。要在宿主机直接跑，先在 `127.0.0.1:15432` 起一个 PostgreSQL，建好 `intenttrace/intenttrace` 角色和库，然后：
+`pnpm humanrl:up` 就是下面这些的合集。IntentTrace 的 Docker 路径（`pnpm docker:up`、`pnpm demo:load`）没有变；宿主机路径：
 
 ```bash
-corepack pnpm install --frozen-lockfile
 corepack pnpm --filter './packages/*' build
-set -a; source .env.example; set +a
+set -a; source .env.example; set +a          # DATABASE_URL 指向 127.0.0.1:15432
 corepack pnpm --filter @intenttrace/db migrate
 corepack pnpm --filter @intenttrace/api dev &
 corepack pnpm --filter @intenttrace/worker dev &
@@ -36,7 +89,7 @@ corepack pnpm --filter @intenttrace/web dev --hostname 127.0.0.1 --port 3000 &
 INTENTTRACE_WEB_ORIGIN=http://127.0.0.1:3000 corepack pnpm demo:load
 ```
 
-然后打开 `http://127.0.0.1:3000/traces`，选那条九 lane 的 IMO 录制 trace。下面是 IntentTrace 原有的 README。
+下面是 IntentTrace 原有的 README。
 
 ---
 

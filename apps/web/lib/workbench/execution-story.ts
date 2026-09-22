@@ -64,6 +64,7 @@ export interface MessageStep {
   seq: number;
   occurredAt: string;
   event: RawTraceEvent;
+  role: "user" | "assistant";
   label: string;
   text: string;
 }
@@ -99,7 +100,7 @@ export function splitName(name: string): { head: string; detail: string | null }
 }
 
 export function toolNameOf(event: RawTraceEvent): string {
-  const explicit = stringAttr(event, "tool");
+  const explicit = stringAttr(event, "tool") ?? stringAttr(event, "toolName");
   if (explicit) return explicit;
   const { head } = splitName(event.name);
   const afterColon = head.includes(":") ? head.slice(head.indexOf(":") + 1).trim() : "";
@@ -122,10 +123,52 @@ const KIND_FALLBACK: Record<string, string> = {
   tool_call: "Called a tool",
 };
 
+/**
+ * Messages the harness injects around the conversation (AGENTS.md, environment
+ * context, skill catalogues, role preambles) are not the author's prompt and
+ * not the agent's narration. Codex tags them as user or assistant messages, so
+ * they are recognised by shape.
+ */
+export function isHarnessMessage(text: string): boolean {
+  return /^\s*(?:<[a-z_]+[^>]*>|#\s*AGENTS\.md|<INSTRUCTIONS>)/iu.test(text);
+}
+
+/** The author's prompt: the first user message that is neither a task assignment nor harness-injected. */
+export function firstUserPrompt(events: readonly RawTraceEvent[]): RawTraceEvent | null {
+  return (
+    [...events]
+      .sort((a, b) => seqOf(a) - seqOf(b))
+      .find(
+        (event) =>
+          event.kind === "user_message" &&
+          !stringAttr(event, "assignedBy") &&
+          !isHarnessMessage(splitName(event.name).detail ?? event.name),
+      ) ?? null
+  );
+}
+
+/**
+ * Codex records an exec call as the JavaScript it ran; the commands inside
+ * (`cmd:"…"`) are the readable part. Anything else is shown as written.
+ */
+export function summarizeAction(detail: string): string {
+  // The name is capped at 240 characters, so the last command may be cut off
+  // before its closing quote; take it to the end of the text in that case.
+  const commands = [...detail.matchAll(/cmd:\s*"((?:[^"\\]|\\.)*)(?:"|$)/gu)].map((match) =>
+    match[1]!.replace(/\\"/gu, '"').replace(/\\n/gu, " ").trim(),
+  );
+  if (commands.length === 0) return detail.replace(/\s+/gu, " ").trim();
+  const first = commands[0]!;
+  return commands.length > 1 ? `${first}  (+${commands.length - 1} more)` : first;
+}
+
 export function describeToolCall(event: RawTraceEvent): { tool: string; action: string } {
   const tool = toolNameOf(event);
   const { detail } = splitName(event.name);
-  return { tool, action: detail ?? KIND_FALLBACK[event.kind] ?? event.name };
+  return {
+    tool,
+    action: detail ? summarizeAction(detail) : (KIND_FALLBACK[event.kind] ?? event.name),
+  };
 }
 
 function callStatus(call: RawTraceEvent, result: RawTraceEvent | null): StoryCallStatus {
@@ -248,9 +291,15 @@ export function buildExecutionStory(events: readonly RawTraceEvent[]): StoryStep
       continue;
     }
 
-    if (event.kind === "user_message" && !stringAttr(event, "assignedBy")) {
-      openTools.delete(agentId);
+    if (event.kind === "user_message" || event.kind === "assistant_message") {
       const { head, detail } = splitName(event.name);
+      const text = detail ?? event.name;
+      if (isHarnessMessage(text)) continue;
+      const role = event.kind === "user_message" ? "user" : "assistant";
+      if (role === "user" && stringAttr(event, "assignedBy")) continue;
+      // A message between two calls of the same tool starts a new step: the
+      // agent said something, so the second run has a different reason.
+      openTools.delete(agentId);
       steps.push({
         kind: "message",
         id: event.id,
@@ -258,13 +307,14 @@ export function buildExecutionStory(events: readonly RawTraceEvent[]): StoryStep
         seq,
         occurredAt: event.occurredAt,
         event,
+        role,
         label: head,
-        text: detail ?? event.name,
+        text,
       });
       continue;
     }
-    // Model calls, assistant messages and tool results do not break a tool
-    // run; only a different tool or a lane event does.
+    // Model calls, tool results and logs do not break a tool run; only a
+    // different tool, a message or a lane event does.
   }
   return steps;
 }

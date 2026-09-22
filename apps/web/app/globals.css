@@ -288,6 +288,14 @@ button:disabled {
 .execution-step--message {
   background: rgb(89 182 255 / 5%);
 }
+.execution-step--assistant {
+  background: transparent;
+  border-color: var(--color-line-soft);
+}
+.execution-message--quiet {
+  color: var(--color-muted);
+  -webkit-line-clamp: 2;
+}
 .execution-step__button,
 .execution-call__button {
   display: grid;

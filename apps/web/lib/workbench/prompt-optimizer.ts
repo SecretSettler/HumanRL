@@ -1,4 +1,10 @@
-import { TOOL_CALL_KINDS, splitName, toolNameOf } from "./execution-story";
+import {
+  TOOL_CALL_KINDS,
+  firstUserPrompt,
+  isHarnessMessage,
+  splitName,
+  toolNameOf,
+} from "./execution-story";
 import type { RawTraceEvent } from "./types";
 
 /**
@@ -109,17 +115,43 @@ function isFailedResult(event: RawTraceEvent): boolean {
 export function promptTokensOf(event: RawTraceEvent): number {
   const preview = splitName(event.name).detail ?? event.name;
   const fromPreview = estimateTokens(preview);
+  if (!isTruncatedName(event.name)) return fromPreview;
   const bytes = event.payloadRef?.byteLength ?? 0;
   const fromPayload = bytes > 0 ? Math.ceil(Math.max(0, bytes - 11) / 4) : 0;
   return Math.max(fromPreview, fromPayload);
 }
 
-/** The root lane: the agent that received the first non-assigned user message. */
+/**
+ * Adapters cut long previews with an ellipsis around 200 characters and the
+ * schema caps `name` at 240; either way the preview is not the whole text.
+ */
+function isTruncatedName(name: string): boolean {
+  return name.endsWith("…") || name.length >= 200;
+}
+
+/** The root lane: the agent that received the author's prompt. */
 export function rootAgentOf(events: readonly RawTraceEvent[]): string | null {
-  const first = [...events]
-    .sort((a, b) => seqOf(a) - seqOf(b))
-    .find((event) => event.kind === "user_message" && !stringAttr(event, "assignedBy"));
-  return first?.agentId ?? null;
+  return firstUserPrompt(events)?.agentId ?? null;
+}
+
+/**
+ * Model turns in a lane. Adapters that record `model_call` events give the
+ * exact count; Codex does not, so each narrated assistant message and each
+ * tool call stands in for one turn there.
+ */
+export function turnEvents(lane: readonly RawTraceEvent[]): RawTraceEvent[] {
+  const explicit = lane.filter((event) => event.kind === "model_call");
+  if (explicit.length > 0) return explicit;
+  return lane.filter(
+    (event) =>
+      TOOL_CALL_KINDS.has(event.kind) ||
+      (event.kind === "assistant_message" &&
+        !isHarnessMessage(splitName(event.name).detail ?? event.name)),
+  );
+}
+
+export function modelTurns(lane: readonly RawTraceEvent[]): number {
+  return turnEvents(lane).length;
 }
 
 export function accountSpawns(events: readonly RawTraceEvent[]): SpawnAccounting[] {
@@ -161,9 +193,9 @@ export function accountSpawns(events: readonly RawTraceEvent[]): SpawnAccounting
             assignmentTokens += estimateTokens(splitName(event.name).detail ?? event.name);
         }
       }
-      const parentModelCallsBefore = (byAgent.get(parentAgentId) ?? []).filter(
-        (event) => event.kind === "model_call" && seqOf(event) < seq,
-      ).length;
+      const parentModelCallsBefore = modelTurns(
+        (byAgent.get(parentAgentId) ?? []).filter((event) => seqOf(event) < seq),
+      );
 
       const spawnCostTokens = childAgentIds.length * CHILD_FIXED_OVERHEAD_TOKENS + assignmentTokens;
       const absorbedTokens =
@@ -210,9 +242,7 @@ export function evaluatePromptOptimization({
     ? ordered.filter((event) => event.agentId === rootAgentId)
     : ordered.filter((event) => !event.agentId);
 
-  const firstPrompt = ordered.find(
-    (event) => event.kind === "user_message" && !stringAttr(event, "assignedBy"),
-  );
+  const firstPrompt = firstUserPrompt(ordered);
   const promptTokens = firstPrompt ? promptTokensOf(firstPrompt) : 0;
 
   const spawns = accountSpawns(ordered);
@@ -238,7 +268,7 @@ export function evaluatePromptOptimization({
   ).length;
   const rootCallNames = rootCalls.map((event) => `${toolNameOf(event)}\u0000${event.name}`);
   const repeatedToolCalls = rootCallNames.length - new Set(rootCallNames).size;
-  const contextPressure = rootLane.filter((event) => event.kind === "model_call").length;
+  const contextPressure = modelTurns(rootLane);
 
   const spawnCostTokens = CHILD_FIXED_OVERHEAD_TOKENS + Math.ceil(promptTokens * 0.5);
   const expectedSavedTokens =

@@ -100,7 +100,10 @@ describe("reviewPrompt", () => {
 
   it("uses the payload size when the name preview is truncated", () => {
     const s = new StoryEvents();
-    const prompt = s.user("Short preview of a long prompt");
+    const prompt = s.user(
+      "Preview of a long prompt that the adapter cut at the name cap ".repeat(4),
+    );
+    prompt.name = prompt.name.slice(0, 240);
     prompt.payloadRef = {
       artifactId: "00000000-0000-4000-8000-0000000000ff",
       sha256: "0".repeat(64),
@@ -182,6 +185,29 @@ describe("reviewPrompt", () => {
     expect(finding.title).toBe("1 action repeated in more than one lane");
     expect(finding.detail).toBe('"read · Reading the TDD skill" in A and B');
     expect(finding.eventIds).toHaveLength(2);
+  });
+
+  it("notes a long single-context run with no subagent, counting Codex turns without model_call events", () => {
+    const s = new StoryEvents();
+    s.push("user_message", "User · # AGENTS.md instructions for ~ <INSTRUCTIONS>", "codex");
+    s.push("user_message", "User · Build a trace viewer from these two repos", "codex");
+    for (let index = 0; index < 22; index += 1) {
+      s.push("tool_call", `Tool call: exec · cmd:"ls ${index}"`, "codex", {
+        attributes: { toolName: "exec" },
+      });
+      s.push("tool_result", "Tool result: exec · Script completed", "codex", {
+        attributes: { toolName: "exec" },
+      });
+    }
+    s.push("assistant_message", "Assistant · Done.", "codex");
+    const result = review(s);
+    expect(result.promptPreview).toBe("Build a trace viewer from these two repos");
+    const finding = result.findings.find((item) => item.id === "no-delegation");
+    if (!finding) throw new Error("expected no-delegation finding");
+    expect(finding.title).toBe(
+      "Everything ran in one context: 22 tool calls, 23 turns, no subagent",
+    );
+    expect(finding.eventIds).toHaveLength(22);
   });
 
   it("flags heavy assembly on the orchestrator after the last join", () => {

@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildExecutionStory,
   describeToolCall,
+  firstUserPrompt,
+  isHarnessMessage,
   pairToolResults,
   splitName,
   storyTotals,
+  summarizeAction,
 } from "./execution-story";
 import { StoryEvents } from "./story-test-events";
 
@@ -27,6 +30,54 @@ describe("splitName / describeToolCall", () => {
     const s = new StoryEvents();
     const call = s.push("file_read", "read", "Orchestrator");
     expect(describeToolCall(call)).toEqual({ tool: "read", action: "Read a file" });
+  });
+});
+
+describe("harness messages and Codex exec scripts", () => {
+  it("recognises injected instructions and picks the author's prompt after them", () => {
+    expect(isHarnessMessage("# AGENTS.md instructions for ~ <INSTRUCTIONS> …")).toBe(true);
+    expect(isHarnessMessage("<environment_context> <cwd>~</cwd>")).toBe(true);
+    expect(isHarnessMessage("<multi_agent_role>You are `/root`")).toBe(true);
+    expect(isHarnessMessage("给你一个空Repo，你能不能搭一个 trace 可视化")).toBe(false);
+    expect(isHarnessMessage("Fix the failing test")).toBe(false);
+
+    const s = new StoryEvents();
+    s.push("user_message", "User · # AGENTS.md instructions for ~ <INSTRUCTIONS>", "codex");
+    const real = s.push("user_message", "User · 给你一个空Repo，搭一个 trace 可视化", "codex");
+    expect(firstUserPrompt(s.events)?.id).toBe(real.id);
+  });
+
+  it("shows the commands inside a Codex exec script instead of the script", () => {
+    const script =
+      'const r = await Promise.allSettled([ tools.exec_command({cmd:"git clone https://x/y.git ~/y",workdir:"~"}), tools.exec_command({cmd:"cat ~/y/README.md",workdir:"~"}) ]);';
+    expect(summarizeAction(script)).toBe("git clone https://x/y.git ~/y  (+1 more)");
+    expect(summarizeAction("Reading plan-writing skill")).toBe("Reading plan-writing skill");
+    expect(
+      summarizeAction(
+        'const r = await tools.exec_command({cmd:"rsync -a --exclude .git ~/a/ ~/b/ && cp ~/a/LIC',
+      ),
+    ).toBe("rsync -a --exclude .git ~/a/ ~/b/ && cp ~/a/LIC");
+    const s = new StoryEvents();
+    const call = s.push("tool_call", `Tool call: exec · ${script}`, "codex", {
+      attributes: { toolName: "exec" },
+    });
+    expect(describeToolCall(call)).toEqual({
+      tool: "exec",
+      action: "git clone https://x/y.git ~/y  (+1 more)",
+    });
+  });
+
+  it("keeps narrated assistant messages as steps and drops injected ones", () => {
+    const s = new StoryEvents();
+    s.push("assistant_message", "Assistant · <skills_instructions> ## Skills", "codex");
+    s.push("user_message", "User · Build the thing", "codex");
+    s.push("tool_call", "Tool call: exec · cmd one", "codex", { attributes: { toolName: "exec" } });
+    s.push("assistant_message", "Assistant · Repos look fine, wiring the panel now.", "codex");
+    s.push("tool_call", "Tool call: exec · cmd two", "codex", { attributes: { toolName: "exec" } });
+    const steps = buildExecutionStory(s.events);
+    expect(
+      steps.map((step) => (step.kind === "message" ? `${step.role}` : `${step.kind}`)),
+    ).toEqual(["user", "tools", "assistant", "tools"]);
   });
 });
 
