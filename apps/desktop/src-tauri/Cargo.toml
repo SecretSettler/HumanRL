@@ -11,7 +11,7 @@ publish = false
 tauri-build = "=2.6.3"
 
 [dependencies]
-flate2 = "=1.1.9"
+flate2 = "=1.1.10"
 serde = { version = "=1.0.229", features = ["derive"] }
 tar = "=0.4.46"
 tauri = "=2.11.5"
