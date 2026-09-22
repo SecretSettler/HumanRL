@@ -12,25 +12,22 @@ It is built on [IntentTrace](https://github.com/chivier/IntentTrace), a local-fi
 curl -fsSL https://raw.githubusercontent.com/SecretSettler/HumanRL/main/install.sh | bash
 ```
 
-That clones into `~/HumanRL` (or updates it), installs dependencies, starts PostgreSQL, migrates, runs the API, worker and web, loads the demo trace and opens it in your browser. The only things you need beforehand are `git` and Node.js (24 recommended, 22 works with a warning); the script tells you what to install if either is missing. PostgreSQL comes from Docker Compose when you have it, otherwise from `docker run`, Homebrew `postgresql@17` or an existing `DATABASE_URL`, in that order.
+That clones into `~/HumanRL`, installs, puts a `humanrl` command on your PATH, starts everything (PostgreSQL, API, worker, web), loads the demo trace and opens it in your browser. You need `git` and Node.js (24 recommended, 22 works); the script says what to install if either is missing.
 
-Already have the repository? `corepack pnpm humanrl:up` does the same from inside it. `pnpm humanrl:down` stops everything it started, `pnpm humanrl:status` says what is running, logs are under `.intenttrace/logs/`. `HUMANRL_DIR` changes where the installer clones, `HUMANRL_NO_OPEN=1` keeps the browser closed.
-
-## Bring your own session
+## Then
 
 ```bash
-# the most recent Codex session on this machine
-pnpm humanrl:import -- --source codex --path ~/.codex/sessions --newest --max-files 1
-
-# the three most recent Claude Code sessions
-pnpm humanrl:import -- --source claude --path ~/.claude/projects --newest --max-files 3
-
-# or pick by hand: list, copy an id, import it
-pnpm humanrl:import -- discover --source codex --path ~/.codex/sessions --limit 20
-pnpm humanrl:import -- --source codex --path ~/.codex/sessions --session <24-char id>
+humanrl codex        # import your latest Codex session and open it
+humanrl claude       # same for your latest Claude Code session
+humanrl claude 3     # the latest three
+humanrl              # open the demo (starts the stack if it is down)
+humanrl status       # running or not, and every trace you have
+humanrl stop
 ```
 
-Then open `http://127.0.0.1:3000/traces` and pick the trace. The browser `/import` page does the same with drag and drop. Imports strip hidden reasoning, encrypted content and host paths before anything is stored (see [Importing traces](#importing-traces) below).
+`humanrl import <file-or-directory>` takes any session bundle (source guessed from the path; add `--source codex|claude|opencode|omp|grok` if it cannot be). Codex sessions are read from `~/.codex/sessions`, Claude Code sessions from `~/.claude/projects`; `HUMANRL_CODEX_DIR` / `HUMANRL_CLAUDE_DIR` override that. Sessions over 64 MiB are skipped with a note. Imports strip hidden reasoning, encrypted content and host paths before anything is stored (see [Importing traces](#importing-traces) below).
+
+Inside the repository the same commands are `pnpm humanrl codex`, `pnpm humanrl stop`, and so on. PostgreSQL comes from Docker Compose when you have it, otherwise from `docker run`, Homebrew `postgresql@17` or an existing `DATABASE_URL`, in that order. Logs are under `.intenttrace/logs/`. `HUMANRL_DIR` changes where the installer clones, `HUMANRL_NO_OPEN=1` keeps the browser closed.
 
 ## How to read the page
 
@@ -59,7 +56,7 @@ Then open `http://127.0.0.1:3000/traces` and pick the trace. The browser `/impor
 | Note    | The orchestrator took 14 turns after the last child joined                                                 | Assembly happened in its heaviest context.                                                                                                                                |
 | Note    | Delegation paid off: 3 waves, 8 agents, net ≥41k tokens kept out of the orchestrator                       | The parallel structure itself was right.                                                                                                                                  |
 
-**The Codex session that built this repository** (imported with the command above) is the other kind of run: one agent, no subagents, 45 `exec` calls. The story collapses to "user asked → agent said what it would do → 8 commands → agent reported → 14 commands → …", each `exec` shown as the shell command it ran rather than the JavaScript wrapper Codex records. The review has one note: _Everything ran in one context: 45 tool calls, 48 turns, no subagent_, with the observation that the two repository reads were independent and a scout per repo would have kept their output out of the main context.
+**The Codex session that built this repository** (`humanrl codex` at the time) is the other kind of run: one agent, no subagents, 45 `exec` calls. The story collapses to "user asked → agent said what it would do → 8 commands → agent reported → 14 commands → …", each `exec` shown as the shell command it ran rather than the JavaScript wrapper Codex records. The review has one note: _Everything ran in one context: 45 tool calls, 48 turns, no subagent_, with the observation that the two repository reads were independent and a scout per repo would have kept their output out of the main context.
 
 ![The imported Codex session: one lane, commands summarised, no delegation](docs/assets/humanrl-codex-session.png)
 

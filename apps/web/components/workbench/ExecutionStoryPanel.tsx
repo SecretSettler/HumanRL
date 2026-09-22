@@ -6,6 +6,7 @@ import { agentColor, laneOrderFor } from "@/lib/workbench/agent-colors";
 import {
   buildExecutionStory,
   storyTotals,
+  traceStartMs,
   type StoryCall,
   type StoryStep,
   type ToolStep,
@@ -36,8 +37,10 @@ function stepStatus(step: ToolStep): keyof typeof STATUS_GLYPH {
   return "completed";
 }
 
-function offsetLabel(startMs: number, iso: string): string {
-  return `+${formatDurationMs(Date.parse(iso) - startMs)}`;
+function offsetLabel(startMs: number | null, iso: string): string {
+  const ms = Date.parse(iso);
+  if (startMs === null || !Number.isFinite(ms) || ms < startMs) return "";
+  return `+${formatDurationMs(ms - startMs)}`;
 }
 
 function LaneDot({ color, name }: { color: string; name: string }) {
@@ -86,7 +89,7 @@ function StepRow({
 }: {
   step: StoryStep;
   color: string;
-  startMs: number;
+  startMs: number | null;
   expanded: boolean;
   spawnAccount: SpawnAccounting | undefined;
   onToggle: () => void;
@@ -275,8 +278,9 @@ export function extractMessageText(body: string): string {
   try {
     const parsed = JSON.parse(body) as Record<string, unknown>;
     if (typeof parsed.text === "string") return parsed.text;
-    const payload = (parsed.payload ?? parsed) as Record<string, unknown>;
+    const payload = (parsed.payload ?? parsed.message ?? parsed) as Record<string, unknown>;
     const content = payload.content;
+    if (typeof content === "string" && content.trim()) return content;
     if (Array.isArray(content)) {
       const parts = content
         .map((part) =>
@@ -388,10 +392,7 @@ export function ExecutionStoryPanel() {
       ),
     [snapshot],
   );
-  const startMs = useMemo(() => {
-    const first = snapshot?.raw.events[0];
-    return first ? Date.parse(first.occurredAt) : Date.now();
-  }, [snapshot]);
+  const startMs = useMemo(() => traceStartMs(snapshot?.raw.events ?? []), [snapshot]);
 
   const select = (eventId: string) => store.getState().selectEvent(eventId);
   const toggle = (id: string) =>

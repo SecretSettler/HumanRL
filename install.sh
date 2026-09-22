@@ -3,9 +3,13 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/SecretSettler/HumanRL/main/install.sh | bash
 #
-# Clones (or updates) the repository into ~/HumanRL, installs dependencies
-# and runs `pnpm humanrl:up`, which starts PostgreSQL, the API, the worker
-# and the web app, loads the demo trace and opens it in your browser.
+# Clones (or updates) the repository into ~/HumanRL, installs dependencies,
+# puts the `humanrl` command on your PATH and starts it: PostgreSQL, the API,
+# the worker and the web app, the demo trace, your browser. Afterwards:
+#
+#   humanrl codex     import your latest Codex session and open it
+#   humanrl claude    the same for Claude Code
+#   humanrl stop
 #
 # Knobs (environment variables):
 #   HUMANRL_DIR=~/somewhere   where to clone            (default ~/HumanRL)
@@ -49,5 +53,25 @@ cd "$DIR"
 say "Installing dependencies (pnpm via corepack; first time takes a few minutes)"
 corepack pnpm install --frozen-lockfile
 
+# Put `humanrl` on PATH: first writable directory already on PATH, else ~/.local/bin.
+link_humanrl() {
+  local candidate
+  for candidate in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin" "$HOME/bin"; do
+    case ":$PATH:" in *":$candidate:"*) ;; *) continue ;; esac
+    if [ -d "$candidate" ] && [ -w "$candidate" ]; then
+      ln -sf "$DIR/bin/humanrl" "$candidate/humanrl" && echo "$candidate" && return
+    fi
+  done
+  mkdir -p "$HOME/.local/bin"
+  ln -sf "$DIR/bin/humanrl" "$HOME/.local/bin/humanrl"
+  echo "$HOME/.local/bin"
+}
+LINKED="$(link_humanrl)"
+say "Installed the humanrl command in $LINKED"
+case ":$PATH:" in
+  *":$LINKED:"*) ;;
+  *) printf '\033[33m!\033[0m %s is not on your PATH yet. Add this to your shell profile, then open a new terminal:\n    export PATH="%s:$PATH"\n' "$LINKED" "$LINKED" ;;
+esac
+
 say "Starting HumanRL"
-exec corepack pnpm humanrl:up
+exec "$DIR/bin/humanrl"

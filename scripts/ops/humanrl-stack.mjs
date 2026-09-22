@@ -1,22 +1,32 @@
 #!/usr/bin/env node
 /**
- * One command to a running HumanRL: `pnpm humanrl:up`.
+ * The `humanrl` command.
  *
- *   up      start PostgreSQL, migrate, run api + worker + web, load the demo
- *           trace, print the URL and open it
- *   down    stop what `up` started
- *   status  show what is running and the URL
- *   import  import your own Codex or Claude sessions (see --help)
+ *   humanrl                 start HumanRL if it is not running and open it
+ *   humanrl codex [N]       import your newest N Codex sessions (default 1) and open the newest
+ *   humanrl claude [N]      the same for Claude Code sessions
+ *   humanrl import <path>   import a session file or directory (source guessed from the path)
+ *   humanrl status          what is running, and the URL
+ *   humanrl stop            stop everything `humanrl` started
  *
  * With Docker Compose available the whole stack runs in containers, exactly
  * as IntentTrace ships it. Without it (no compose plugin, or a Docker daemon
  * that is out of disk) the services run on the host: PostgreSQL from a
  * `docker run`, or a Homebrew `postgresql@17`, or an already reachable
- * DATABASE_URL. Logs and pids live under `.intenttrace/`.
+ * DATABASE_URL. Logs, pids and the web origin live under `.intenttrace/`.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -26,6 +36,11 @@ const stateDir = join(root, ".intenttrace");
 const logDir = join(stateDir, "logs");
 const pidFile = join(stateDir, "humanrl.pids");
 const pgFile = join(stateDir, "humanrl.postgres");
+const originFile = join(stateDir, "humanrl.origin");
+const SESSION_DIRS = {
+  codex: join(process.env.HOME ?? "", ".codex", "sessions"),
+  claude: join(process.env.HOME ?? "", ".claude", "projects"),
+};
 const WEB_PORT = Number(process.env.HUMANRL_WEB_PORT ?? 3000);
 const WEB_ORIGIN = `http://127.0.0.1:${WEB_PORT}`;
 const PG_CONTAINER = "humanrl-postgres";
@@ -260,20 +275,48 @@ function upCompose() {
   return match[1];
 }
 
-async function up() {
-  const useCompose = process.env.HUMANRL_HOST !== "1" && hasCompose();
-  const origin = useCompose ? upCompose() : await upHost();
-  log("Loading the recorded nine-lane IMO demo trace");
-  pnpm(["demo:load"], { env: { ...env, INTENTTRACE_WEB_ORIGIN: origin } });
+async function isUp(origin) {
+  return globalThis
+    .fetch(`${origin}/healthz`)
+    .then((response) => response.ok)
+    .catch(() => false);
+}
+
+function savedOrigin() {
+  return existsSync(originFile) ? readFileSync(originFile, "utf8").trim() : WEB_ORIGIN;
+}
+
+async function demoUrl(origin) {
   const traces = await (await globalThis.fetch(`${origin}/api/v1/traces`)).json();
   const demo = traces.traces.find((trace) => /IMO 2025/u.test(trace.title)) ?? traces.traces[0];
-  const url = demo ? `${origin}/traces/${demo.id}` : `${origin}/traces`;
-  process.stdout.write(`\nHumanRL is up: ${url}\n`);
-  process.stdout.write(
-    `Import your own sessions: pnpm humanrl:import -- --source codex --path ~/.codex/sessions --newest --max-files 1\n`,
-  );
-  process.stdout.write(`Stop it: pnpm humanrl:down\n\n`);
+  return demo ? `${origin}/traces/${demo.id}` : `${origin}/traces`;
+}
+
+function show(url) {
+  process.stdout.write(`\n${url}\n\n`);
   if (process.env.HUMANRL_NO_OPEN !== "1") openBrowser(url);
+}
+
+/** Start the stack unless it is already answering; returns the web origin. */
+async function ensureUp() {
+  const origin = savedOrigin();
+  if (await isUp(origin)) return origin;
+  const useCompose = process.env.HUMANRL_HOST !== "1" && hasCompose();
+  const started = useCompose ? upCompose() : await upHost();
+  mkdirSync(stateDir, { recursive: true });
+  writeFileSync(originFile, `${started}\n`);
+  log("Loading the recorded nine-lane IMO demo trace");
+  pnpm(["demo:load"], { env: { ...env, INTENTTRACE_WEB_ORIGIN: started }, stdio: "ignore" });
+  return started;
+}
+
+async function up() {
+  const origin = await ensureUp();
+  const url = await demoUrl(origin);
+  process.stdout.write(
+    `\nHumanRL is up. Next: \`humanrl codex\` or \`humanrl claude\` imports your latest session; \`humanrl stop\` shuts it down.\n`,
+  );
+  show(url);
 }
 
 function down() {
@@ -305,60 +348,239 @@ function down() {
     log("stopped PostgreSQL");
     rmSync(pgFile);
   }
+  if (existsSync(originFile)) rmSync(originFile);
 }
 
 async function status() {
-  const web = await globalThis
-    .fetch(`${WEB_ORIGIN}/healthz`)
-    .then((r) => r.ok)
-    .catch(() => false);
-  const api = await globalThis
-    .fetch(`http://127.0.0.1:${env.API_PORT ?? 3001}/readyz`)
-    .then((r) => r.ok)
-    .catch(() => false);
-  process.stdout.write(`web ${web ? "up" : "down"} at ${WEB_ORIGIN}\napi ${api ? "up" : "down"}\n`);
-  if (existsSync(pidFile)) process.stdout.write(readFileSync(pidFile, "utf8"));
+  const origin = savedOrigin();
+  const web = await isUp(origin);
+  process.stdout.write(`${web ? "running" : "stopped"} · ${origin}\n`);
+  if (web) {
+    const traces = await (await globalThis.fetch(`${origin}/api/v1/traces`)).json();
+    for (const trace of traces.traces)
+      process.stdout.write(
+        `  ${trace.title.slice(0, 60).padEnd(60)}  ${origin}/traces/${trace.id}\n`,
+      );
+  }
 }
 
-function importSessions(args) {
-  if (args.includes("--help") || args.length === 0) {
-    process.stdout.write(
-      [
-        "Usage: pnpm humanrl:import -- --source <codex|claude|opencode|omp|grok> --path <dir> [--newest --max-files N | --session <id>...]",
-        "",
-        "  --newest --max-files 1   import the most recently modified session under <dir>",
-        "  --session ID             import a catalog id printed by `pnpm humanrl:import -- discover --source … --path …`",
-        "",
-        "Examples:",
-        "  pnpm humanrl:import -- --source codex --path ~/.codex/sessions --newest --max-files 1",
-        "  pnpm humanrl:import -- --source claude --path ~/.claude/projects --newest --max-files 3",
-        "",
-      ].join("\n"),
+function guessSource(path) {
+  if (/[/\\]\.codex[/\\]|rollout-\d{4}-\d{2}-\d{2}T/u.test(path)) return "codex";
+  if (/[/\\]\.claude[/\\]/u.test(path)) return "claude";
+  if (/[/\\]\.local[/\\]share[/\\]opencode|opencode/iu.test(path)) return "opencode";
+  return null;
+}
+
+function collector(args) {
+  const result = spawnSync(
+    "corepack",
+    ["pnpm", "--silent", "--filter", "@intenttrace/collector", "dev", ...args],
+    { cwd: root, env, encoding: "utf8" },
+  );
+  const records = [];
+  for (const line of `${result.stdout}\n${result.stderr}`.split("\n")) {
+    if (!line.startsWith("{")) continue;
+    try {
+      records.push(JSON.parse(line));
+    } catch {
+      // not one of ours
+    }
+  }
+  return { status: result.status, records, raw: `${result.stdout}\n${result.stderr}` };
+}
+
+/**
+ * Newest sessions first, as the collector's discovery ranks them. Sessions
+ * over the collector's size limit are reported separately so `humanrl codex`
+ * skips them instead of failing on a 500 MB transcript that is still open.
+ */
+function discover(source, path) {
+  const { status, records, raw } = collector([
+    "discover",
+    "--source",
+    source,
+    "--path",
+    path,
+    "--limit",
+    "50",
+  ]);
+  const catalog = records.find((record) => record.command === "discover" && record.sessions);
+  if (status !== 0 || !catalog) {
+    process.stderr.write(raw);
+    fail(`could not list ${source} sessions under ${path}`);
+  }
+  return catalog;
+}
+
+/** Import chosen catalog ids and return the trace ids, in the order given. */
+function collect(source, path, sessionIds) {
+  const { status, records, raw } = collector([
+    "import",
+    "--source",
+    source,
+    "--path",
+    path,
+    "--api",
+    savedOrigin(),
+    ...sessionIds.flatMap((id) => ["--session", id]),
+  ]);
+  const traceIds = records
+    .filter((record) => record.level === "result" && record.traceId)
+    .map((record) => record.traceId);
+  for (const record of records.filter((record) => record.level === "error"))
+    process.stderr.write(`  ${record.code ?? "error"}: ${record.message}\n`);
+  const summary = records.find((record) => record.level === "summary");
+  if (summary)
+    log(
+      `${summary.imported} imported, ${summary.failed} failed, ${summary.inserted} events inserted, ${summary.duplicates} already known`,
     );
-    return;
+  if (status !== 0 && traceIds.length === 0) {
+    process.stderr.write(raw);
+    fail(`import failed (source ${source}, path ${path})`);
   }
-  if (args[0] === "discover") {
-    pnpm(["--filter", "@intenttrace/collector", "dev", ...args]);
-    return;
-  }
-  pnpm(["--filter", "@intenttrace/collector", "dev", "import", ...args, "--api", WEB_ORIGIN]);
-  process.stdout.write(`\nOpen ${WEB_ORIGIN}/traces and pick the new trace.\n`);
+  return traceIds;
 }
 
-const [command = "help", ...rest] = process.argv.slice(2);
+/**
+ * The directories that hold whole session bundles, newest first. The
+ * collector keeps at most 50 candidates per root and picks them by path
+ * before ordering by time, so handing it `~/.codex/sessions` with a summer's
+ * worth of transcripts hides the newest ones. Codex bundles live in a day
+ * directory, Claude Code bundles in a project directory (sidecars sit in
+ * subdirectories next to the transcript), so those are the roots.
+ */
+function bundleRoots(source, path) {
+  if (source !== "codex" && source !== "claude") return [path];
+  // A Claude Code transcript is only recognised next to its sidecars, so a
+  // single file is looked up through its directory and matched below.
+  if (statSync(path).isFile()) return [source === "claude" ? dirname(path) : path];
+  const roots = new Map();
+  const skipDirs = new Set(["memory", "subagents", "tool-results", "node_modules"]);
+  const walk = (directory) => {
+    let entries;
+    try {
+      entries = readdirSync(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      const child = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        if (!skipDirs.has(entry.name)) walk(child);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      if (source === "codex" && !entry.name.startsWith("rollout-")) continue;
+      const mtime = statSync(child).mtimeMs;
+      roots.set(directory, Math.max(roots.get(directory) ?? 0, mtime));
+    }
+  };
+  walk(path);
+  return [...roots.entries()].sort((a, b) => b[1] - a[1]).map(([directory]) => directory);
+}
+
+async function importSessions(source, path, count) {
+  const origin = await ensureUp();
+  if (!existsSync(path)) fail(`${path} does not exist`);
+  log(`Looking for ${source} sessions under ${path}`);
+  const file = statSync(path).isFile() ? statSync(path) : null;
+  const isThatFile = (session) =>
+    file === null ||
+    session.byteLength === file.size ||
+    Math.trunc(Date.parse(session.modifiedAt)) === Math.trunc(file.mtimeMs);
+  const chosen = [];
+  let tooLarge = 0;
+  for (const rootDir of bundleRoots(source, path)) {
+    if (chosen.length >= count) break;
+    const catalog = discover(source, rootDir);
+    tooLarge += catalog.failed.filter((item) => item.code === "file_too_large").length;
+    for (const session of catalog.sessions.filter(isThatFile)) {
+      if (chosen.length >= count) break;
+      chosen.push({ ...session, rootDir });
+    }
+  }
+  if (tooLarge > 0) {
+    log(
+      `Skipping ${tooLarge} session${tooLarge === 1 ? "" : "s"} over the collector's 64 MiB limit`,
+    );
+  }
+  if (chosen.length === 0) fail(`no importable ${source} session under ${path}`);
+  chosen.sort((a, b) => Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt));
+  log(
+    `Importing the newest ${chosen.length}: ${chosen
+      .map((item) => `${item.eventCount} events, ${new Date(item.lastActivityAt).toLocaleString()}`)
+      .join(" · ")}`,
+  );
+  const byRoot = new Map();
+  for (const item of chosen)
+    byRoot.set(item.rootDir, [...(byRoot.get(item.rootDir) ?? []), item.id]);
+  const traceIds = [];
+  for (const [rootDir, ids] of byRoot) traceIds.push(...collect(source, rootDir, ids));
+  if (traceIds.length === 0) fail("nothing was imported");
+  show(`${origin}/traces/${traceIds[0]}`);
+}
+
+function usage() {
+  process.stdout.write(
+    [
+      "humanrl                  start HumanRL (if needed) and open the demo trace",
+      "humanrl codex [N]        import your newest N Codex sessions (default 1) and open the newest",
+      "humanrl claude [N]       the same for Claude Code sessions",
+      "humanrl import <path>    import a session file or directory; add --source codex|claude|opencode|omp|grok if it cannot be guessed",
+      "humanrl status           running or not, the URL, and the traces you have",
+      "humanrl stop             stop everything humanrl started",
+      "",
+      `Session directories: codex ${SESSION_DIRS.codex} · claude ${SESSION_DIRS.claude}`,
+      "",
+    ].join("\n"),
+  );
+}
+
+function countArg(value, fallback = 1) {
+  const count = Number(value ?? fallback);
+  if (!Number.isInteger(count) || count < 1) fail(`expected a positive number, got ${value}`);
+  return count;
+}
+
+const [command = "up", ...rest] = process.argv.slice(2);
 switch (command) {
   case "up":
+  case "start":
+  case "open":
     await up();
     break;
-  case "down":
-    down();
+  case "codex":
+  case "claude":
+    await importSessions(
+      command,
+      process.env[`HUMANRL_${command.toUpperCase()}_DIR`] ?? SESSION_DIRS[command],
+      countArg(rest[0]),
+    );
     break;
+  case "import": {
+    const path = rest.find((arg) => !arg.startsWith("--") && !/^\d+$/u.test(arg));
+    if (!path) fail("humanrl import <path> [N] [--source …]");
+    const flagIndex = rest.indexOf("--source");
+    const source = flagIndex >= 0 ? rest[flagIndex + 1] : guessSource(resolve(path));
+    if (!source)
+      fail(
+        `cannot tell what kind of session ${path} is; add --source codex|claude|opencode|omp|grok`,
+      );
+    const count = countArg(
+      rest.find((arg) => /^\d+$/u.test(arg)),
+      1,
+    );
+    await importSessions(source, resolve(path), count);
+    break;
+  }
   case "status":
     await status();
     break;
-  case "import":
-    importSessions(rest);
+  case "stop":
+  case "down":
+    down();
     break;
   default:
-    process.stdout.write("Usage: pnpm humanrl:<up|down|status|import>\n");
+    usage();
 }

@@ -205,7 +205,7 @@ describe("reviewPrompt", () => {
     const finding = result.findings.find((item) => item.id === "no-delegation");
     if (!finding) throw new Error("expected no-delegation finding");
     expect(finding.title).toBe(
-      "Everything ran in one context: 22 tool calls, 23 turns, no subagent",
+      "Everything ran in one context: 22 tool calls, 22 turns, no subagent",
     );
     expect(finding.eventIds).toHaveLength(22);
   });

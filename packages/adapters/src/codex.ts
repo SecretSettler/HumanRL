@@ -5,6 +5,7 @@ import {
   decodeAdapterBytes,
   displayName,
   displayPreview,
+  isHarnessPreview,
   normalizeEvent,
   objectRecord,
   readSessionRecords,
@@ -245,24 +246,28 @@ export class CodexSessionAdapter implements TraceAdapter {
         }
       }
     }
-    const firstRequestPayload = objectRecord(
-      traceParts
-        .flatMap((part) => part.records)
-        .map((record) => objectRecord(record.value))
-        .find((object) => {
-          const payload = objectRecord(object?.payload);
-          return (
-            (object?.type === "event_msg" && payload?.type === "user_message") ||
-            (object?.type === "response_item" &&
-              payload?.type === "message" &&
-              payload?.role === "user")
-          );
-        })?.payload,
-    );
-    const tracePreview = displayPreview(
-      firstRequestPayload?.message ?? firstRequestPayload?.content,
-      120,
-    );
+    const requestPreviews = traceParts
+      .flatMap((part) => part.records)
+      .map((record) => objectRecord(record.value))
+      .filter((object) => {
+        const payload = objectRecord(object?.payload);
+        return (
+          (object?.type === "event_msg" && payload?.type === "user_message") ||
+          (object?.type === "response_item" &&
+            payload?.type === "message" &&
+            payload?.role === "user")
+        );
+      })
+      .map((object) => {
+        const payload = objectRecord(object?.payload);
+        return displayPreview(payload?.message ?? payload?.content, 120);
+      });
+    // Title after the person's request, not the AGENTS.md / environment
+    // context the harness sends first.
+    const tracePreview =
+      requestPreviews.find((preview) => preview && !isHarnessPreview(preview)) ??
+      requestPreviews[0] ??
+      "";
     const traceTitle = tracePreview ? `Codex · ${tracePreview}` : "Codex session";
     const emittedPayloads = new Set<string>();
     const emittedMessages = new Set<string>();

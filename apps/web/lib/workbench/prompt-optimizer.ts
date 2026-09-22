@@ -142,12 +142,16 @@ export function rootAgentOf(events: readonly RawTraceEvent[]): string | null {
 export function turnEvents(lane: readonly RawTraceEvent[]): RawTraceEvent[] {
   const explicit = lane.filter((event) => event.kind === "model_call");
   if (explicit.length > 0) return explicit;
-  return lane.filter(
+  // Claude Code writes one assistant record per turn, tool-use turns included;
+  // Codex writes only the narrated ones and a tool call per turn. Whichever
+  // series is longer is the closer count.
+  const assistant = lane.filter(
     (event) =>
-      TOOL_CALL_KINDS.has(event.kind) ||
-      (event.kind === "assistant_message" &&
-        !isHarnessMessage(splitName(event.name).detail ?? event.name)),
+      event.kind === "assistant_message" &&
+      !isHarnessMessage(splitName(event.name).detail ?? event.name),
   );
+  const calls = lane.filter((event) => TOOL_CALL_KINDS.has(event.kind));
+  return assistant.length >= calls.length ? assistant : calls;
 }
 
 export function modelTurns(lane: readonly RawTraceEvent[]): number {

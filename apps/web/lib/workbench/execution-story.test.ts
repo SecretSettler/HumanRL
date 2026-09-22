@@ -9,6 +9,7 @@ import {
   splitName,
   storyTotals,
   summarizeAction,
+  traceStartMs,
 } from "./execution-story";
 import { StoryEvents } from "./story-test-events";
 
@@ -78,6 +79,71 @@ describe("harness messages and Codex exec scripts", () => {
     expect(
       steps.map((step) => (step.kind === "message" ? `${step.role}` : `${step.kind}`)),
     ).toEqual(["user", "tools", "assistant", "tools"]);
+  });
+});
+
+describe("Claude Code shapes", () => {
+  it("pairs unnamed results with the oldest open call in the lane", () => {
+    const s = new StoryEvents();
+    const bash = s.push(
+      "tool_call",
+      'Tool call: Bash · {"command":"ls","description":"List files"}',
+      "claude",
+      {
+        attributes: { toolName: "Bash" },
+      },
+    );
+    const search = s.push(
+      "tool_call",
+      'Tool call: ToolSearch · {"query":"select:WebSearch"}',
+      "claude",
+      {
+        attributes: { toolName: "ToolSearch" },
+      },
+    );
+    const r1 = s.push("tool_result", "Tool result · file list", "claude");
+    const r2 = s.push("tool_result", "Tool result · tool reference", "claude");
+    const paired = pairToolResults(s.events);
+    expect(paired.get(bash.id)?.id).toBe(r1.id);
+    expect(paired.get(search.id)?.id).toBe(r2.id);
+  });
+
+  it("shows the description or target of a JSON tool input", () => {
+    expect(summarizeAction('{"command":"cat a.md b.md","description":"Read both notes"}')).toBe(
+      "Read both notes",
+    );
+    expect(summarizeAction('{"command":"git status"}')).toBe("git status");
+    expect(summarizeAction('{"file_path":"/x/y.ts","limit":40}')).toBe("/x/y.ts");
+    expect(summarizeAction('{"query":"select:WebSearch,WebFetch","max_results":2}')).toBe(
+      "select:WebSearch,WebFetch",
+    );
+    // truncated at the name cap: the fragment is marked, a surviving complete value wins
+    expect(
+      summarizeAction('{"command":"cat ~/notes/a-very-long-directory-name/infra'),
+    ).toBe("cat ~/notes/a-very-long-directory-name/infra…");
+    expect(
+      summarizeAction('{"command":"cat a-very-long-path/that/goes/on","description":"Rea'),
+    ).toBe("cat a-very-long-path/that/goes/on");
+  });
+
+  it("ignores epoch-stamped metadata when computing the trace start", () => {
+    const s = new StoryEvents();
+    const meta = s.push("log", "Summary", "claude");
+    meta.occurredAt = "1970-01-01T00:00:00.000Z";
+    const first = s.push("user_message", "User · Hello", "claude");
+    expect(traceStartMs(s.events)).toBe(Date.parse(first.occurredAt));
+    expect(traceStartMs([meta])).toBeNull();
+  });
+
+  it("drops assistant records that carry no text (tool-use-only turns)", () => {
+    const s = new StoryEvents();
+    s.push("user_message", "User · Do it", "claude");
+    s.push("assistant_message", "Assistant", "claude");
+    s.push("tool_call", 'Tool call: Bash · {"command":"ls"}', "claude", {
+      attributes: { toolName: "Bash" },
+    });
+    const steps = buildExecutionStory(s.events);
+    expect(steps.map((step) => step.kind)).toEqual(["message", "tools"]);
   });
 });
 

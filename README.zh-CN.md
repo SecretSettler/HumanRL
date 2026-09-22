@@ -12,25 +12,22 @@
 curl -fsSL https://raw.githubusercontent.com/SecretSettler/HumanRL/main/install.sh | bash
 ```
 
-这一行会把仓库 clone 到 `~/HumanRL`（已有就更新）、装依赖、起 PostgreSQL、跑迁移、启动 api / worker / web、灌入 demo trace、在浏览器里打开。事先只需要 `git` 和 Node.js（推荐 24，22 能跑只有 warning），缺了脚本会告诉你装什么。PostgreSQL 依次尝试 Docker Compose、`docker run`、Homebrew 的 `postgresql@17`、已有的 `DATABASE_URL`。
+这一行会把仓库 clone 到 `~/HumanRL`、装依赖、把 `humanrl` 命令放进 PATH、起全套（PostgreSQL、api、worker、web）、灌入 demo trace、在浏览器里打开。事先只需要 `git` 和 Node.js（推荐 24，22 能跑），缺了脚本会告诉你装什么。
 
-已经有仓库了？在里面跑 `corepack pnpm humanrl:up` 效果一样。`pnpm humanrl:down` 停掉它起的所有东西，`pnpm humanrl:status` 看状态，日志在 `.intenttrace/logs/`。`HUMANRL_DIR` 改 clone 位置，`HUMANRL_NO_OPEN=1` 不开浏览器。
-
-## 导入你自己的 session
+## 然后
 
 ```bash
-# 这台机器上最近一次 Codex session
-pnpm humanrl:import -- --source codex --path ~/.codex/sessions --newest --max-files 1
-
-# 最近三次 Claude Code session
-pnpm humanrl:import -- --source claude --path ~/.claude/projects --newest --max-files 3
-
-# 或者手选：先列出来，复制 id，再导入
-pnpm humanrl:import -- discover --source codex --path ~/.codex/sessions --limit 20
-pnpm humanrl:import -- --source codex --path ~/.codex/sessions --session <24 位 id>
+humanrl codex        # 导入你最近一次 Codex session 并打开
+humanrl claude       # 最近一次 Claude Code session
+humanrl claude 3     # 最近三次
+humanrl              # 打开 demo（没起的话先起）
+humanrl status       # 在不在跑，以及你有哪些 trace
+humanrl stop
 ```
 
-然后打开 `http://127.0.0.1:3000/traces` 选那条 trace。浏览器里的 `/import` 页面拖拽文件也一样。导入时会剥掉隐藏推理、加密内容和主机路径再落库。
+`humanrl import <文件或目录>` 导入任意 session（来源按路径猜，猜不到加 `--source codex|claude|opencode|omp|grok`）。Codex 从 `~/.codex/sessions` 读，Claude Code 从 `~/.claude/projects` 读，`HUMANRL_CODEX_DIR` / `HUMANRL_CLAUDE_DIR` 可以改。超过 64 MiB 的 session 会跳过并提示。导入时会剥掉隐藏推理、加密内容和主机路径再落库。
+
+在仓库目录里同样的命令是 `pnpm humanrl codex`、`pnpm humanrl stop` 等。PostgreSQL 依次尝试 Docker Compose、`docker run`、Homebrew 的 `postgresql@17`、已有的 `DATABASE_URL`。日志在 `.intenttrace/logs/`。`HUMANRL_DIR` 改 clone 位置，`HUMANRL_NO_OPEN=1` 不开浏览器。
 
 ## 页面怎么看
 
@@ -59,7 +56,7 @@ pnpm humanrl:import -- --source codex --path ~/.codex/sessions --session <24 位
 | Note    | 最后一个子 agent 回来后 orchestrator 又跑了 14 轮                               | 组装发生在它最重的上下文里。                                                                              |
 | Note    | 委派值回票价：3 波、8 个 agent，净省 ≥41k token 没进 orchestrator 上下文        | 并行结构本身是对的。                                                                                      |
 
-**搭这个仓库的那次 Codex session**（用上面的命令导入）是另一种运行：单 agent、没有子 agent、45 次 `exec`。故事压成“用户提问 → agent 说打算怎么做 → 8 条命令 → agent 汇报 → 14 条命令 → …”，每次 `exec` 显示它跑的 shell 命令而不是 Codex 记录的 JavaScript 外壳。review 只有一条 note：_Everything ran in one context: 45 tool calls, 48 turns, no subagent_，指出两个仓库的阅读是独立的，一个仓库一个 scout 就能把那些输出挡在主上下文外。
+**搭这个仓库的那次 Codex session**（当时用 `humanrl codex` 导入）是另一种运行：单 agent、没有子 agent、45 次 `exec`。故事压成“用户提问 → agent 说打算怎么做 → 8 条命令 → agent 汇报 → 14 条命令 → …”，每次 `exec` 显示它跑的 shell 命令而不是 Codex 记录的 JavaScript 外壳。review 只有一条 note：_Everything ran in one context: 45 tool calls, 48 turns, no subagent_，指出两个仓库的阅读是独立的，一个仓库一个 scout 就能把那些输出挡在主上下文外。
 
 ![导入的 Codex session：单 lane，命令已摘要，没有委派](docs/assets/humanrl-codex-session.png)
 

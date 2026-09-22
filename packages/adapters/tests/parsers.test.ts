@@ -253,6 +253,96 @@ describe("implemented trace adapters", () => {
     expect(serialized).not.toContain("must-not-persist");
   });
 
+  it("titles Codex and Claude traces after the person's request, not harness boilerplate", async () => {
+    const codexLines = [
+      {
+        type: "session_meta",
+        version: "codex-jsonl-v1",
+        timestamp: "2026-08-01T00:00:00.000Z",
+        payload: { id: "codex-title", agent_id: "root" },
+      },
+      {
+        type: "response_item",
+        version: "codex-jsonl-v1",
+        timestamp: "2026-08-01T00:00:01.000Z",
+        payload: {
+          id: "m1",
+          type: "message",
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "# AGENTS.md instructions for ~\n\n<INSTRUCTIONS>\nbe nice\n</INSTRUCTIONS>",
+            },
+            {
+              type: "input_text",
+              text: "<environment_context>\n<cwd>~</cwd>\n</environment_context>",
+            },
+          ],
+        },
+      },
+      {
+        type: "response_item",
+        version: "codex-jsonl-v1",
+        timestamp: "2026-08-01T00:00:02.000Z",
+        payload: {
+          id: "m2",
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "Fix the failing build" }],
+        },
+      },
+    ];
+    const codexRecords = await parse(
+      new CodexSessionAdapter(),
+      new TextEncoder().encode(codexLines.map((line) => JSON.stringify(line)).join("\n")),
+    );
+    const codexEvent = codexRecords.find((record) => record.type === "event");
+    expect(codexEvent?.type === "event" ? codexEvent.event.traceTitle : null).toBe(
+      "Codex · Fix the failing build",
+    );
+
+    const claudeLines = [
+      { type: "mode", mode: "default", sessionId: "claude-title" },
+      {
+        type: "user",
+        version: "2.1.69",
+        uuid: "u1",
+        sessionId: "claude-title",
+        timestamp: "2026-08-01T00:00:00.000Z",
+        message: {
+          role: "user",
+          content:
+            "<local-command-caveat>Caveat: generated while running local commands</local-command-caveat>",
+        },
+      },
+      {
+        type: "user",
+        version: "2.1.69",
+        uuid: "u2",
+        sessionId: "claude-title",
+        timestamp: "2026-08-01T00:00:01.000Z",
+        message: { role: "user", content: "<command-name>/model</command-name>" },
+      },
+      {
+        type: "user",
+        version: "2.1.69",
+        uuid: "u3",
+        sessionId: "claude-title",
+        timestamp: "2026-08-01T00:00:02.000Z",
+        message: { role: "user", content: "Explain the crash" },
+      },
+    ];
+    const claudeRecords = await parse(
+      new ClaudeSessionAdapter(),
+      new TextEncoder().encode(claudeLines.map((line) => JSON.stringify(line)).join("\n")),
+    );
+    const claudeEvent = claudeRecords.find((record) => record.type === "event");
+    expect(claudeEvent?.type === "event" ? claudeEvent.event.traceTitle : null).toBe(
+      "Claude · Explain the crash",
+    );
+  });
+
   it("maps OpenCode SQLite topology, both join envelopes, and recovered overflow", async () => {
     const parts = [
       { path: "opencode.db", bytes: await fixture("opencode", "topology/opencode.db") },

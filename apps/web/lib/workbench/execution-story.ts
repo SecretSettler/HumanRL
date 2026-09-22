@@ -100,12 +100,16 @@ export function splitName(name: string): { head: string; detail: string | null }
 }
 
 export function toolNameOf(event: RawTraceEvent): string {
+  return explicitToolName(event) ?? KIND_TOOL[event.kind] ?? event.kind;
+}
+
+/** The tool an event names, or null when the adapter did not say (Claude Code results). */
+function explicitToolName(event: RawTraceEvent): string | null {
   const explicit = stringAttr(event, "tool") ?? stringAttr(event, "toolName");
   if (explicit) return explicit;
   const { head } = splitName(event.name);
   const afterColon = head.includes(":") ? head.slice(head.indexOf(":") + 1).trim() : "";
-  if (afterColon) return afterColon;
-  return KIND_TOOL[event.kind] ?? event.kind;
+  return afterColon || null;
 }
 
 const KIND_TOOL: Record<string, string> = {
@@ -152,6 +156,8 @@ export function firstUserPrompt(events: readonly RawTraceEvent[]): RawTraceEvent
  * (`cmd:"…"`) are the readable part. Anything else is shown as written.
  */
 export function summarizeAction(detail: string): string {
+  const fromJson = summarizeJsonInput(detail);
+  if (fromJson) return fromJson;
   // The name is capped at 240 characters, so the last command may be cut off
   // before its closing quote; take it to the end of the text in that case.
   const commands = [...detail.matchAll(/cmd:\s*"((?:[^"\\]|\\.)*)(?:"|$)/gu)].map((match) =>
@@ -160,6 +166,52 @@ export function summarizeAction(detail: string): string {
   if (commands.length === 0) return detail.replace(/\s+/gu, " ").trim();
   const first = commands[0]!;
   return commands.length > 1 ? `${first}  (+${commands.length - 1} more)` : first;
+}
+
+/**
+ * Claude Code records a tool call as its JSON input. The human phrase is the
+ * `description` when the tool has one, otherwise the argument that names the
+ * target: a command, a path, a pattern, a query, a URL, a prompt.
+ */
+const INPUT_KEYS = [
+  "description",
+  "command",
+  "file_path",
+  "path",
+  "notebook_path",
+  "pattern",
+  "query",
+  "url",
+  "prompt",
+  "skill",
+];
+
+function summarizeJsonInput(detail: string): string | null {
+  const text = detail.trim();
+  if (!text.startsWith("{")) return null;
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    // Truncated JSON: the name cap cut the input somewhere. Prefer a value
+    // whose closing quote survived; otherwise the longest fragment.
+    const complete: string[] = [];
+    const fragments: string[] = [];
+    for (const key of INPUT_KEYS) {
+      const match = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)("?)`, "u").exec(text);
+      if (!match?.[1]) continue;
+      const value = match[1].replace(/\\"/gu, '"').replace(/\\n/gu, " ").trim();
+      (match[2] ? complete : fragments).push(value);
+    }
+    const best = complete[0] ?? fragments.sort((a, b) => b.length - a.length)[0];
+    return best ? `${best}${complete[0] ? "" : "…"}` : null;
+  }
+  for (const key of INPUT_KEYS) {
+    const value = parsed[key];
+    if (typeof value === "string" && value.trim()) return value.replace(/\s+/gu, " ").trim();
+  }
+  const first = Object.values(parsed).find((value) => typeof value === "string" && value.trim());
+  return typeof first === "string" ? first.replace(/\s+/gu, " ").trim() : null;
 }
 
 export function describeToolCall(event: RawTraceEvent): { tool: string; action: string } {
@@ -193,32 +245,41 @@ export function pairToolResults(
   const pending = new Map<string, RawTraceEvent[]>();
   const paired = new Map<string, RawTraceEvent | null>();
 
-  const queueKey = (event: RawTraceEvent) => `${event.agentId ?? ""}\u0000${toolNameOf(event)}`;
+  const laneKey = (event: RawTraceEvent) => `${event.agentId ?? ""}\u0000`;
+  const toolKey = (event: RawTraceEvent) => `${laneKey(event)}${toolNameOf(event)}`;
+  const enqueue = (key: string, event: RawTraceEvent) => {
+    const queue = pending.get(key) ?? [];
+    queue.push(event);
+    pending.set(key, queue);
+  };
+  const settle = (call: RawTraceEvent, result: RawTraceEvent) => {
+    paired.set(call.id, result);
+    for (const key of [toolKey(call), laneKey(call)]) {
+      const queue = pending.get(key);
+      const index = queue?.indexOf(call) ?? -1;
+      if (queue && index >= 0) queue.splice(index, 1);
+    }
+  };
 
   for (const event of ordered) {
     if (TOOL_CALL_KINDS.has(event.kind)) {
       paired.set(event.id, null);
-      const key = queueKey(event);
-      const queue = pending.get(key) ?? [];
-      queue.push(event);
-      pending.set(key, queue);
+      enqueue(toolKey(event), event);
+      enqueue(laneKey(event), event);
       continue;
     }
     if (event.kind !== "tool_result") continue;
 
     const causation = event.causationEventId ? byId.get(event.causationEventId) : undefined;
-    if (causation && paired.has(causation.id) && paired.get(causation.id) === null) {
-      paired.set(causation.id, event);
-      const queue = pending.get(queueKey(causation));
-      if (queue) {
-        const index = queue.indexOf(causation);
-        if (index >= 0) queue.splice(index, 1);
-      }
+    if (causation && paired.get(causation.id) === null) {
+      settle(causation, event);
       continue;
     }
-    const queue = pending.get(queueKey(event));
-    const call = queue?.shift();
-    if (call) paired.set(call.id, event);
+    // Same tool in the same lane when the result names its tool (canonical
+    // JSONL, Codex); otherwise the oldest open call in the lane (Claude Code).
+    const key = explicitToolName(event) ? toolKey(event) : laneKey(event);
+    const call = pending.get(key)?.[0];
+    if (call) settle(call, event);
   }
   return paired;
 }
@@ -293,6 +354,8 @@ export function buildExecutionStory(events: readonly RawTraceEvent[]): StoryStep
 
     if (event.kind === "user_message" || event.kind === "assistant_message") {
       const { head, detail } = splitName(event.name);
+      // A tool-use-only assistant turn has no text; it is not narration.
+      if (event.kind === "assistant_message" && !detail) continue;
       const text = detail ?? event.name;
       if (isHarnessMessage(text)) continue;
       const role = event.kind === "user_message" ? "user" : "assistant";
@@ -318,6 +381,22 @@ export function buildExecutionStory(events: readonly RawTraceEvent[]): StoryStep
   }
   return steps;
 }
+
+/**
+ * When the trace started, for "+3m 21s" offsets. Some adapters stamp their
+ * metadata records with the epoch, so the earliest plausible time wins.
+ */
+export function traceStartMs(events: readonly RawTraceEvent[]): number | null {
+  let start: number | null = null;
+  for (const event of events) {
+    const ms = Date.parse(event.occurredAt);
+    if (!Number.isFinite(ms) || ms < EARLIEST_PLAUSIBLE_MS) continue;
+    if (start === null || ms < start) start = ms;
+  }
+  return start;
+}
+
+const EARLIEST_PLAUSIBLE_MS = Date.UTC(2000, 0, 1);
 
 export interface StoryTotals {
   toolCalls: number;

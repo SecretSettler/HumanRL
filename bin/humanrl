@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# `humanrl` on your PATH: resolves this file through any symlink back to the
+# repository and runs the command there, so it works from any directory.
+set -euo pipefail
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+  TARGET="$(readlink "$SOURCE")"
+  case "$TARGET" in
+    /*) SOURCE="$TARGET" ;;
+    *) SOURCE="$(cd "$(dirname "$SOURCE")" && pwd)/$TARGET" ;;
+  esac
+done
+ROOT="$(cd "$(dirname "$SOURCE")/.." && pwd)"
+exec node "$ROOT/scripts/ops/humanrl-stack.mjs" "$@"

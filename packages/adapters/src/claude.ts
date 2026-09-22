@@ -4,6 +4,7 @@ import {
   decodeAdapterBytes,
   displayName,
   displayPreview,
+  isHarnessPreview,
   normalizeEvent,
   objectRecord,
   readSessionRecords,
@@ -210,11 +211,17 @@ export class ClaudeSessionAdapter implements TraceAdapter {
     );
 
     const asyncJoins = new Set<string>();
-    const firstRequest = parts
+    const requestPreviews = parts
       .flatMap((part) => part.records)
       .map((record) => objectRecord(record.value))
-      .find((object) => object?.type === "user" && objectRecord(object.message)?.role === "user");
-    const tracePreview = displayPreview(objectRecord(firstRequest?.message)?.content, 120);
+      .filter((object) => object?.type === "user" && objectRecord(object.message)?.role === "user")
+      .map((object) => displayPreview(objectRecord(object?.message)?.content, 120));
+    // Title after the person's request, not the slash-command echoes and
+    // caveats the harness records as user turns first.
+    const tracePreview =
+      requestPreviews.find((preview) => preview && !isHarnessPreview(preview)) ??
+      requestPreviews[0] ??
+      "";
     const traceTitle = tracePreview ? `Claude · ${tracePreview}` : "Claude session";
     const emit = (
       part: ClaudePart,

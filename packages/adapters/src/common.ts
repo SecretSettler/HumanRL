@@ -233,6 +233,16 @@ export function displayPreview(value: unknown, limit = 200): string {
   return normalized.slice(0, limit);
 }
 
+/**
+ * Messages the harness injects ahead of the person's request: AGENTS.md
+ * instructions, environment context, slash-command echoes, skill catalogues,
+ * role preambles. They are recognised by shape so a trace is titled after
+ * the request, not the boilerplate.
+ */
+export function isHarnessPreview(preview: string): boolean {
+  return /^\s*(?:<[a-z_-]+[^>]*>|#\s*AGENTS\.md|<INSTRUCTIONS>)/iu.test(preview);
+}
+
 export function displayName(label: string, value?: unknown): string {
   const preview = value === undefined ? "" : displayPreview(value);
   return preview ? `${label} · ${preview}` : label;
