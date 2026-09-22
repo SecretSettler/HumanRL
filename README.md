@@ -1,6 +1,8 @@
 # HumanRL
 
-**Was my prompt any good?** HumanRL answers that from the trace an agent left behind. Point it at a Codex or Claude session (or the bundled demo) and it shows, in plain English, what every tool call did, where the agent spawned subagents, whether each spawn was worth its tokens, and what in your prompt caused the waste.
+People spend their days doing RL on agents and never on themselves. When a run goes badly the reflex is to blame the model, but often the agent was capable enough and the human wrote a bad prompt: no deliverable, no boundaries, work that could have run in parallel handed over as one sentence. The reward signal for the human is sitting in the trace; nobody reads it.
+
+HumanRL reads it for you. Point it at a Codex or Claude Code session (or the bundled demo) and it shows, in plain English, what every tool call did, where the agent spawned subagents, whether each spawn was worth its tokens, and which line of your prompt caused the waste. Then you write a better prompt.
 
 It is built on [IntentTrace](https://github.com/chivier/IntentTrace), a local-first agent-observability workbench, and keeps everything IntentTrace has (append-only raw events, Intent Graph, Agent Gantt, replay slider, Evidence Inspector). Nothing leaves your machine.
 

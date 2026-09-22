@@ -1,6 +1,8 @@
 # HumanRL
 
-HumanRL 给用 Codex 或 Claude Code 的人看自己的 prompt 写得怎么样。把一个 session（或自带的 demo）导进去，它按 trace 列出：每次 tool call 干了什么、agent 在哪里 spawn 了子 agent、每次 spawn 值不值那些 token，以及 prompt 里哪句话造成了浪费。界面是英文的。
+大家天天给 agent 做 RL，却从来不给自己做。一次跑砸了，第一反应是模型不行；但很多时候 agent 的能力够，是人没把 prompt 写好：没说交付物、没划边界、能并行的活一句话丢过去。给人的 reward 信号其实就在 trace 里，只是没人去读。
+
+HumanRL 替你读。把一个 Codex 或 Claude Code 的 session（或自带的 demo）导进去，它按 trace 列出：每次 tool call 干了什么、agent 在哪里 spawn 了子 agent、每次 spawn 值不值那些 token，以及 prompt 里哪句话造成了浪费。然后你把 prompt 改好。界面是英文的。
 
 它建在 [IntentTrace](https://github.com/chivier/IntentTrace) 上，保留 IntentTrace 的全部功能（只追加的 raw event、Intent Graph、Agent Gantt、回放滑块、Evidence Inspector），数据不出本机。
 
