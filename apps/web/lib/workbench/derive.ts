@@ -57,18 +57,27 @@ export interface WorkbenchStats {
   evidenceCoverage: number | null;
 }
 
+const EARLIEST_PLAUSIBLE_MS = Date.UTC(2000, 0, 1);
+
 export function deriveStats(
   snapshot: TraceSnapshot | null,
   graph: SemanticGraphSnapshot | null,
   providerCalls: readonly ProviderCallAudit[] | null,
 ): WorkbenchStats {
   const agents = snapshot?.agents ?? [];
-  const laneStart = agents.map((lane) => lane.startedAt).sort()[0] ?? null;
-  const laneEnd =
-    agents
-      .map((lane) => lane.endedAt)
-      .sort()
-      .at(-1) ?? null;
+  // Some adapters stamp metadata records with the epoch; a lane that starts
+  // there would make the run look 50 years long, so those starts are ignored.
+  // A lane whose first record is one of those covers the whole run from
+  // 1970, so the raw events' own timestamps are used alongside the lanes.
+  const plausible = (iso: string) => Date.parse(iso) >= EARLIEST_PLAUSIBLE_MS;
+  const stamps = [
+    ...agents.flatMap((lane) => [lane.startedAt, lane.endedAt]),
+    ...(snapshot?.raw.events ?? []).map((event) => event.occurredAt),
+  ]
+    .filter(plausible)
+    .sort();
+  const laneStart = stamps[0] ?? null;
+  const laneEnd = stamps.at(-1) ?? null;
   const duration =
     laneStart && laneEnd
       ? formatDurationBetween(laneStart, laneEnd)

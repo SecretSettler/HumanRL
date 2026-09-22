@@ -10,6 +10,7 @@ import {
   nodeProvenance,
   nodeSummaryText,
 } from "./derive";
+import { StoryEvents } from "./story-test-events";
 import type { SemanticGraphSnapshot, TraceSnapshot } from "./types";
 import { edgeKindMeta, nodeKindMeta, nodeStatusMeta } from "./graph-meta";
 import { formatCostUsd, formatDurationBetween, formatDurationMs } from "./format";
@@ -194,6 +195,40 @@ describe("deriveStats", () => {
     expect(stats.failures).toBe(2);
     expect(stats.cost).toBe("$0.010");
     expect(stats.evidenceCoverage).toBe(30);
+  });
+
+  it("ignores epoch-stamped lanes when computing the duration", () => {
+    const snapshot = makeSnapshot();
+    const [first, ...rest] = snapshot.agents;
+    if (!first) throw new Error("fixture has no lanes");
+    const withEpochLane = {
+      ...snapshot,
+      agents: [
+        {
+          ...first,
+          agentId: "metadata",
+          startedAt: "1970-01-01T00:00:00.000Z",
+          endedAt: "1970-01-01T00:00:00.000Z",
+        },
+        first,
+        ...rest,
+      ],
+    };
+    expect(deriveStats(withEpochLane, makeGraph(), null).duration).toBe("2m 00s");
+
+    // Only lane, and it starts at the epoch: the raw events carry the run's real span.
+    const story = new StoryEvents();
+    const meta = story.push("log", "Summary", "claude");
+    meta.occurredAt = "1970-01-01T00:00:00.000Z";
+    story.push("user_message", "User · Go", "claude").occurredAt = "2026-08-03T00:00:00.000Z";
+    story.push("assistant_message", "Assistant · Done", "claude").occurredAt =
+      "2026-08-03T00:03:00.000Z";
+    const onlyEpochLane = {
+      ...snapshot,
+      agents: [{ ...first, startedAt: "1970-01-01T00:00:00.000Z" }],
+      raw: { ...snapshot.raw, events: story.events },
+    };
+    expect(deriveStats(onlyEpochLane, makeGraph(), null).duration).toBe("3m 00s");
   });
 
   it("handles missing snapshot and graph", () => {

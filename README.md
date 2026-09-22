@@ -60,6 +60,10 @@ Inside the repository the same commands are `pnpm humanrl codex`, `pnpm humanrl 
 
 ![The imported Codex session: one lane, commands summarised, no delegation](docs/assets/humanrl-codex-session.png)
 
+**A Claude Code session** (`humanrl claude`) reads the same way: each Bash call shows the description Claude Code attached to it ("Read full memory notes on the multi-agent study"), WebSearch and WebFetch calls show their query or URL, and expanding a step and clicking a call opens its raw event with the sanitized tool input.
+
+![A Claude Code research session: Bash descriptions, searches and fetches, one call expanded into the Evidence Inspector](docs/assets/humanrl-claude-session.png)
+
 ## What the prompt review checks
 
 [`apps/web/lib/workbench/prompt-review.ts`](apps/web/lib/workbench/prompt-review.ts) produces one finding per pattern, each with the events as evidence:

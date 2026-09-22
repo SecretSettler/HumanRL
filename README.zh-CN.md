@@ -60,6 +60,10 @@ humanrl stop
 
 ![导入的 Codex session：单 lane，命令已摘要，没有委派](docs/assets/humanrl-codex-session.png)
 
+**一次 Claude Code session**（`humanrl claude`）读法一样：每次 Bash 调用显示 Claude Code 给它写的描述（"Read full memory notes on the multi-agent study"），WebSearch / WebFetch 显示查询词或 URL，展开一步再点单次调用，右边打开原始事件和 sanitized 的工具输入。
+
+![一次 Claude Code 调研 session：Bash 描述、搜索和抓取，展开的一次调用同步到 Evidence Inspector](docs/assets/humanrl-claude-session.png)
+
 ## 判断规则
 
 Prompt review 的八条检查规则见英文 README 里的表格，代码在 [`apps/web/lib/workbench/prompt-review.ts`](apps/web/lib/workbench/prompt-review.ts)。优化器的两条规则在 [`apps/web/lib/workbench/prompt-optimizer.ts`](apps/web/lib/workbench/prompt-optimizer.ts)：
