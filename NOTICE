@@ -1,7 +1,9 @@
 HumanRL
 Copyright 2026 HumanRL contributors
 
-HumanRL is a derivative work of IntentTrace and is distributed under the same
+HumanRL is a derivative work of IntentTrace by Chivier Humber
+(https://github.com/chivier/IntentTrace), vendored from upstream commit
+5de3e428e36c3b1286bd069edd32ac75742aed7a, and is distributed under the same
 GNU Affero General Public License, Version 3 only (AGPL-3.0-only). The full
 license text is in LICENSE. The upstream project and its notice follow.
 

@@ -108,6 +108,12 @@ corepack pnpm --filter @intenttrace/web dev --hostname 127.0.0.1 --port 3000 &
 INTENTTRACE_WEB_ORIGIN=http://127.0.0.1:3000 corepack pnpm demo:load
 ```
 
+## Acknowledgements
+
+HumanRL exists because of **[IntentTrace](https://github.com/chivier/IntentTrace)** by **[Chivier Humber](https://github.com/chivier)**. The append-only event model, the Codex/Claude/OpenCode/OMP/Grok adapters, the deterministic reducer behind the Intent Graph, the Agent Gantt, the replay watermark and the Evidence Inspector are all IntentTrace's work, vendored here unchanged from commit [`5de3e42`](https://github.com/chivier/IntentTrace/commit/5de3e428e36c3b1286bd069edd32ac75742aed7a). HumanRL adds the Execution story, the prompt review and the spawn accounting on top, and nothing in this repository would render without the foundation underneath it.
+
+IntentTrace is © 2026 Chivier Humber, released under the GNU Affero General Public License v3.0 only; HumanRL is a derivative work under the same licence (see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE)). If you find the trace model useful, star and cite the upstream project; bugs in the panel described above belong here, bugs in the adapters, reducer or API belong upstream.
+
 IntentTrace's own README follows.
 
 ---

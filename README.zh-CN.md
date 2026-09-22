@@ -89,6 +89,12 @@ corepack pnpm --filter @intenttrace/web dev --hostname 127.0.0.1 --port 3000 &
 INTENTTRACE_WEB_ORIGIN=http://127.0.0.1:3000 corepack pnpm demo:load
 ```
 
+## 致谢
+
+HumanRL 建立在 **[Chivier Humber](https://github.com/chivier)** 的 **[IntentTrace](https://github.com/chivier/IntentTrace)** 之上。只追加的事件模型、Codex/Claude/OpenCode/OMP/Grok 各个 adapter、Intent Graph 背后的确定性 reducer、Agent Gantt、回放 watermark 和 Evidence Inspector 全部是 IntentTrace 的工作，这里原封不动地从 commit [`5de3e42`](https://github.com/chivier/IntentTrace/commit/5de3e428e36c3b1286bd069edd32ac75742aed7a) 搬入。HumanRL 只在上面加了 Execution story、prompt review 和 spawn 核算；没有下面这层底座，这个仓库里什么都渲染不出来。
+
+IntentTrace © 2026 Chivier Humber，以 GNU Affero General Public License v3.0 only 发布；HumanRL 作为衍生作品沿用同一许可证（见 [`LICENSE`](LICENSE) 和 [`NOTICE`](NOTICE)）。觉得这套 trace 模型有用的话，请给上游项目加星和引用；上面描述的面板的 bug 报到这里，adapter、reducer、API 的 bug 报到上游。
+
 下面是 IntentTrace 原有的 README。
 
 ---
