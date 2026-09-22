@@ -118,9 +118,9 @@ describe("Claude Code shapes", () => {
       "select:WebSearch,WebFetch",
     );
     // truncated at the name cap: the fragment is marked, a surviving complete value wins
-    expect(
-      summarizeAction('{"command":"cat ~/notes/a-very-long-directory-name/infra'),
-    ).toBe("cat ~/notes/a-very-long-directory-name/infra…");
+    expect(summarizeAction('{"command":"cat ~/notes/a-very-long-directory-name/infra')).toBe(
+      "cat ~/notes/a-very-long-directory-name/infra…",
+    );
     expect(
       summarizeAction('{"command":"cat a-very-long-path/that/goes/on","description":"Rea'),
     ).toBe("cat a-very-long-path/that/goes/on");
