@@ -6,17 +6,15 @@
 
 ![HumanRL 打开自带的九 lane IMO demo：左边 Execution story，右边带证据的 Prompt review](docs/assets/humanrl-demo.png)
 
-## 一条命令
+## 一行
 
 ```bash
-git clone https://github.com/SecretSettler/HumanRL.git && cd HumanRL
-corepack enable && corepack pnpm install --frozen-lockfile
-corepack pnpm humanrl:up
+curl -fsSL https://raw.githubusercontent.com/SecretSettler/HumanRL/main/install.sh | bash
 ```
 
-`humanrl:up` 会起 PostgreSQL、跑迁移、启动 api / worker / web、灌入 demo trace、打印地址并打开浏览器。装了 Docker Compose 就跑 IntentTrace 自带的容器栈；没装（没有 compose 插件，或者 Docker 磁盘满了）就在宿主机直接跑，PostgreSQL 依次尝试 `docker run`、Homebrew 的 `postgresql@17`、已有的 `DATABASE_URL`。`pnpm humanrl:down` 停掉它起的所有东西，`pnpm humanrl:status` 看状态，日志在 `.intenttrace/logs/`。
+这一行会把仓库 clone 到 `~/HumanRL`（已有就更新）、装依赖、起 PostgreSQL、跑迁移、启动 api / worker / web、灌入 demo trace、在浏览器里打开。事先只需要 `git` 和 Node.js（推荐 24，22 能跑只有 warning），缺了脚本会告诉你装什么。PostgreSQL 依次尝试 Docker Compose、`docker run`、Homebrew 的 `postgresql@17`、已有的 `DATABASE_URL`。
 
-需要 Node 24（22 能跑，只有 warning）和 Corepack 管理的 pnpm 11。
+已经有仓库了？在里面跑 `corepack pnpm humanrl:up` 效果一样。`pnpm humanrl:down` 停掉它起的所有东西，`pnpm humanrl:status` 看状态，日志在 `.intenttrace/logs/`。`HUMANRL_DIR` 改 clone 位置，`HUMANRL_NO_OPEN=1` 不开浏览器。
 
 ## 导入你自己的 session
 

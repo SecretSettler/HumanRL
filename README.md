@@ -6,17 +6,15 @@ It is built on [IntentTrace](https://github.com/chivier/IntentTrace), a local-fi
 
 ![HumanRL on the recorded nine-lane IMO demo: Execution story on the left, Prompt review with evidence on the right](docs/assets/humanrl-demo.png)
 
-## One command
+## One line
 
 ```bash
-git clone https://github.com/SecretSettler/HumanRL.git && cd HumanRL
-corepack enable && corepack pnpm install --frozen-lockfile
-corepack pnpm humanrl:up
+curl -fsSL https://raw.githubusercontent.com/SecretSettler/HumanRL/main/install.sh | bash
 ```
 
-`humanrl:up` starts PostgreSQL, migrates, runs the API, worker and web, loads the demo trace, prints the URL and opens it. With Docker Compose installed it runs the containerised stack IntentTrace ships; without it (no compose plugin, or a Docker daemon out of disk) it runs the services on the host and finds PostgreSQL from `docker run`, from Homebrew `postgresql@17`, or from an existing `DATABASE_URL`. `pnpm humanrl:down` stops everything it started; `pnpm humanrl:status` says what is running. Logs are under `.intenttrace/logs/`.
+That clones into `~/HumanRL` (or updates it), installs dependencies, starts PostgreSQL, migrates, runs the API, worker and web, loads the demo trace and opens it in your browser. The only things you need beforehand are `git` and Node.js (24 recommended, 22 works with a warning); the script tells you what to install if either is missing. PostgreSQL comes from Docker Compose when you have it, otherwise from `docker run`, Homebrew `postgresql@17` or an existing `DATABASE_URL`, in that order.
 
-You need Node 24 (22 works with a warning) and pnpm 11 via Corepack.
+Already have the repository? `corepack pnpm humanrl:up` does the same from inside it. `pnpm humanrl:down` stops everything it started, `pnpm humanrl:status` says what is running, logs are under `.intenttrace/logs/`. `HUMANRL_DIR` changes where the installer clones, `HUMANRL_NO_OPEN=1` keeps the browser closed.
 
 ## Bring your own session
 
