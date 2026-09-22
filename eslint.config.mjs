@@ -15,6 +15,7 @@ export default tseslint.config(
       "packages/schema/generated/**",
       "playwright-report/**",
       "test-results/**",
+      "apps/desktop/src-tauri/target/**",
     ],
   },
   eslint.configs.recommended,

@@ -216,10 +216,10 @@ for (const image of lockedImages) {
 
 const baselineVersions = [
   ["package.json", "devDependencies", "typescript", "6.0.3"],
-  ["apps/web/package.json", "dependencies", "next", "16.3.0"],
+  ["apps/web/package.json", "dependencies", "next", "16.3.3"],
   ["apps/web/package.json", "dependencies", "react", "19.2.8"],
   ["apps/web/package.json", "dependencies", "@xyflow/react", "12.11.2"],
-  ["apps/api/package.json", "dependencies", "fastify", "5.11.2"],
+  ["apps/api/package.json", "dependencies", "fastify", "5.12.1"],
   ["packages/schema/package.json", "dependencies", "zod", "4.4.3"],
   ["packages/db/package.json", "dependencies", "drizzle-orm", "0.45.2"],
   ["packages/graph-layout/package.json", "dependencies", "elkjs", "0.12.0"],

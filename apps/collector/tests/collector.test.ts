@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -181,9 +181,11 @@ describe("collector path boundary", () => {
     temporaryDirectories.push(directory);
     const path = join(directory, "session.jsonl");
     await writeFile(path, "secret-not-read-by-validator\n");
+    // macOS puts tmpdir under /var, a symlink to /private/var, so compare
+    // against the resolved path rather than the one we built.
     await expect(validateExplicitPath(path)).resolves.toMatchObject({
       kind: "file",
-      realPath: path,
+      realPath: await realpath(path),
     });
   });
 

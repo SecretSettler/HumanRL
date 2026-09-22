@@ -9,7 +9,7 @@ const artifactId = "88888888-8888-4888-8888-888888888888";
 test("enters at the trace list and states the local MVP boundary", async ({ page, request }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/traces$/);
-  await expect(page.getByRole("heading", { name: "IntentTrace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "HumanRL" })).toBeVisible();
   const boundary = page.getByLabel("Deployment boundary");
   await expect(boundary).toContainText("Local MVP");
   await expect(boundary).toContainText("默认无云 egress");
@@ -249,7 +249,7 @@ test("keeps keyboard focus visible at 200 percent zoom and reduced motion", asyn
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 1024, height: 720 });
   await page.goto("/traces");
-  await expect(page.getByRole("heading", { name: "IntentTrace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "HumanRL" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => {
     document.body.style.zoom = "2";
