@@ -206,6 +206,36 @@ describe("trace API integration boundary", () => {
       },
       observed: { lanes: 2, lanesWithParent: 1, spawnEdges: 1, peerEdges: 0 },
     });
+    expect(response.json().streamCursor).toBe("0");
+  });
+
+  it("tells the client which stream position a snapshot already reflects", async () => {
+    const order: string[] = [];
+    const app = buildApp({
+      services: services(order, {
+        getTrace: async () => ({
+          id: traceId,
+          projectId,
+          title: "Streamed trace",
+          status: "completed",
+          eventCount: "2",
+          latestIngestSeq: "2",
+          latestRevisionId: null,
+          createdAt: "2026-08-03T00:00:00.000Z",
+          updatedAt: "2026-08-03T00:00:01.000Z",
+        }),
+        getStreamBounds: async () => ({ earliest: 11n, latest: 2804n }),
+      }),
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/v1/traces/${traceId}/snapshot`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().streamCursor).toBe("2804");
   });
 
   it("returns audited semantic edge evidence and provenance", async () => {

@@ -10,14 +10,30 @@ import { fetchEventsAfter, fetchGraph } from "./trace-api";
  * coalesces semantic events into a single throttled graph refetch, tracks
  * pending summarizer chunks as deterministic ghosts, and surfaces
  * resync/raw-only states. Never applies provider content directly.
+ *
+ * `cursor` is the stream position the loaded snapshot already reflects; the
+ * stream opens only once it is known (null means no snapshot yet) and resumes
+ * after it, so the trace's history is not replayed on connect.
  */
-export function useTraceStream(traceId: string, fullRefresh: () => Promise<void>) {
+export function useTraceStream(
+  traceId: string,
+  fullRefresh: () => Promise<void>,
+  cursor: string | null,
+) {
   const store = useWorkbenchStore;
 
   useEffect(() => {
-    const source = new EventSource(`/api/v1/traces/${traceId}/stream`);
+    if (cursor === null) return;
+    const source = new EventSource(`/api/v1/traces/${traceId}/stream?cursor=${cursor}`);
     let rawFlushTimer: ReturnType<typeof setTimeout> | undefined;
     let graphFlushTimer: ReturnType<typeof setTimeout> | undefined;
+    let chunkFlushTimer: ReturnType<typeof setTimeout> | undefined;
+    // The stream replays the trace's history on connect: hundreds of pending
+    // chunks, each followed by the revision that resolved it. Applying them one
+    // message at a time re-rendered the whole graph per chunk and froze the
+    // page, so chunks are batched and dropped once a revision covers them.
+    const addedChunks = new Map<string, string>();
+    let resolvedThrough = 0;
     let rawDirty = false;
     let sawLateOrGap = false;
     let pendingRevisionId: string | null = null;
@@ -77,6 +93,20 @@ export function useTraceStream(traceId: string, fullRefresh: () => Promise<void>
       });
     };
 
+    const flushChunks = () => {
+      chunkFlushTimer = undefined;
+      if (closed) return;
+      const state = store.getState();
+      // Final mode never refetches the graph, so a ghost would never clear.
+      if (state.mode === "final") addedChunks.clear();
+      state.applyPendingChunks(addedChunks, resolvedThrough);
+      addedChunks.clear();
+    };
+
+    const scheduleChunks = () => {
+      chunkFlushTimer ??= setTimeout(flushChunks, 250);
+    };
+
     const scheduleGraph = (revisionId: string | null) => {
       if (revisionId) pendingRevisionId = revisionId;
       graphFlushTimer ??= setTimeout(flushGraph, 250);
@@ -103,11 +133,17 @@ export function useTraceStream(traceId: string, fullRefresh: () => Promise<void>
     source.addEventListener("semantic_chunk.pending", (event) => {
       const payload = parse(event);
       if (typeof payload.jobId === "string") {
-        store.getState().addPendingChunk(payload.jobId, String(payload.eventWatermark ?? ""));
+        addedChunks.set(payload.jobId, String(payload.eventWatermark ?? ""));
+        scheduleChunks();
       }
     });
     source.addEventListener("semantic_revision.created", (event) => {
       const payload = parse(event);
+      const watermark = Number(payload.eventWatermark);
+      if (Number.isFinite(watermark) && watermark > resolvedThrough) {
+        resolvedThrough = watermark;
+        scheduleChunks();
+      }
       scheduleGraph(typeof payload.revisionId === "string" ? payload.revisionId : null);
     });
     for (const type of [
@@ -121,6 +157,7 @@ export function useTraceStream(traceId: string, fullRefresh: () => Promise<void>
       store
         .getState()
         .setRawOnlyReason(typeof payload.errorCode === "string" ? payload.errorCode : "unknown");
+      addedChunks.clear();
       store.getState().clearPendingChunks();
     });
     source.addEventListener("resync.required", () => {
@@ -132,7 +169,8 @@ export function useTraceStream(traceId: string, fullRefresh: () => Promise<void>
       closed = true;
       if (rawFlushTimer) clearTimeout(rawFlushTimer);
       if (graphFlushTimer) clearTimeout(graphFlushTimer);
+      if (chunkFlushTimer) clearTimeout(chunkFlushTimer);
       source.close();
     };
-  }, [fullRefresh, store, traceId]);
+  }, [cursor, fullRefresh, store, traceId]);
 }

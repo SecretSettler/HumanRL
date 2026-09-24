@@ -2163,6 +2163,9 @@ paths:
                       - declared
                       - observed
                     additionalProperties: false
+                  streamCursor:
+                    type: string
+                    pattern: ^[0-9]+$
                 required:
                   - trace
                   - raw

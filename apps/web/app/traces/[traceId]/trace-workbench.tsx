@@ -54,7 +54,10 @@ export function TraceWorkbench({ traceId }: { traceId: string }) {
     if (store.getState().mode === "live") store.getState().setGraph(nextGraph);
   }, [store, traceId]);
 
-  useTraceStream(traceId, refresh);
+  const streamCursor = useWorkbenchStore((state) =>
+    state.snapshot?.trace.id === traceId ? (state.snapshot.streamCursor ?? "0") : null,
+  );
+  useTraceStream(traceId, refresh, streamCursor);
   useWorkbenchKeyboard();
 
   useEffect(() => {
