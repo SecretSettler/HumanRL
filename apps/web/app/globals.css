@@ -392,28 +392,6 @@ button:disabled {
   border-color: rgb(89 182 255 / 35%);
   color: var(--color-accent-2);
 }
-.prompt-decision {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--color-line);
-  font-size: var(--text-micro);
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.prompt-decision--spawn {
-  border-color: rgb(83 212 138 / 50%);
-  color: var(--color-green);
-  background: rgb(83 212 138 / 8%);
-}
-.prompt-decision--hold {
-  border-color: rgb(241 185 91 / 45%);
-  color: var(--color-amber);
-  background: rgb(241 185 91 / 8%);
-}
 .spawn-verdict {
   flex: none;
   padding: 1px 7px;
@@ -462,6 +440,25 @@ button:disabled {
 .spawn-figure strong {
   color: var(--color-ink);
   font-variant-numeric: tabular-nums;
+}
+.turn-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  font-size: var(--text-micro);
+  color: var(--color-muted);
+}
+.turn-nav button {
+  padding: 0.125rem 0.5rem;
+  font-size: inherit;
+}
+.turn-nav button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.turn-nav__latest {
+  margin-left: auto;
 }
 .prompt-text {
   display: block;
@@ -554,26 +551,6 @@ button:disabled {
   margin-top: 6px;
   padding: 3px 8px;
   font-size: var(--text-micro);
-}
-.metric-card {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--color-line);
-  border-radius: 8px;
-  background: rgb(21 26 35 / 70%);
-}
-.metric-card span {
-  color: var(--color-muted-2);
-  font-size: var(--text-micro);
-}
-.metric-card strong {
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-title);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .claim button {
   display: block;

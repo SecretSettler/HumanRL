@@ -144,22 +144,24 @@ export function normalizeEvent(
     traceTitle?: string | undefined;
   },
 ): RawTraceEventInput {
-  const sourceInstanceId = safeIdentifier(
-    context.sourceIdentity,
-    `source-${stableUuid("source", context.sourceIdentity)}`,
-  );
+  // Event identity follows the session, as the trace id does, rather than the
+  // bytes of one import (`sourceIdentity` is a content hash). A session file
+  // re-imported after it grew then dedupes the records already stored and
+  // adds only the new ones, instead of landing a second copy of the history.
+  const sessionKey = `${context.source}:${context.sessionId}`;
+  const sourceInstanceId = `session-${stableUuid("source", sessionKey)}`;
   const sourceEventId = safeIdentifier(
     input.sourceEventId ?? `${context.sessionId}-${context.line}`,
     `event-${context.line}`,
   );
-  const traceId = stableUuid("intenttrace-trace", `${context.source}:${context.sessionId}`);
+  const traceId = stableUuid("intenttrace-trace", sessionKey);
   return RawTraceEventInputSchema.parse({
     schemaVersion: SchemaVersion,
     workspaceId: stableUuid("intenttrace-workspace", "local"),
-    projectId: stableUuid("intenttrace-project", context.sourceIdentity),
+    projectId: stableUuid("intenttrace-project", sessionKey),
     traceId,
     workspaceName: "Local workspace",
-    projectName: context.sourceIdentity,
+    projectName: sessionKey,
     traceTitle: input.traceTitle ?? `${context.source} session ${context.sessionId}`,
     source: {
       kind: context.source,

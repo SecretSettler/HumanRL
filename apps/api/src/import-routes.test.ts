@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+import { IntegrityConflictError } from "@intenttrace/db";
 
 import { buildApp } from "./app.js";
 import type { ApiServices } from "./services.js";
@@ -260,6 +261,33 @@ describe("browser session import routes", () => {
     expect(repeat.duplicates).toBe(4);
     expect(repeat.traceId).toBe(original.traceId);
     expect(repeat.sessionId).toBe(original.sessionId);
+  });
+
+  it("keeps the stored copy when a re-imported record was rendered differently", async () => {
+    const order: string[] = [];
+    const base = services(order);
+    const ingest = base.repository.ingest;
+    let calls = 0;
+    base.repository.ingest = async (input) => {
+      calls += 1;
+      if (calls === 2) throw new IntegrityConflictError("00000000-0000-4000-8000-000000000002");
+      return ingest(input);
+    };
+    const app = buildApp({ services: base });
+    apps.push(app);
+    const bytes = await codexFixture();
+    const inspected = await inspect(app, bytes, false);
+    const selectedId = inspected.json().candidates[0].candidateId as string;
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/imports/sessions",
+      headers: { "content-type": "application/vnd.intenttrace.session-bundle" },
+      payload: frame([{ clientRef: "c1", path: "valid.jsonl", bytes }], "codex", [selectedId]),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().results[0]).toMatchObject({ inserted: 3, duplicates: 1, warnings: 1 });
+    expect(calls).toBe(4);
   });
 
   it("rejects unrecognizable bytes before ingesting anything", async () => {

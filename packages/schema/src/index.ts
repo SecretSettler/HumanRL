@@ -526,6 +526,14 @@ export const TraceSnapshotSchema = z
     agents: z.array(AgentTimelineLaneSchema),
     revision: SemanticRevisionSchema.nullable(),
     topology: TraceTopologySchema,
+    /**
+     * Stream position the snapshot already reflects. Open the stream with
+     * `?cursor=` set to it so the history is not replayed on connect.
+     */
+    streamCursor: z
+      .string()
+      .regex(/^[0-9]+$/u)
+      .optional(),
   })
   .strict();
 export type TraceSnapshot = z.infer<typeof TraceSnapshotSchema>;

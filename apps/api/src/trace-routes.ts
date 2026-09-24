@@ -333,7 +333,21 @@ async function persistPreparedBundle(
   let duplicates = 0;
   let warnings = prepared.warnings.length;
   const send = async (input: z.infer<typeof RawTraceEventInputSchema>) => {
-    const result = await services.repository.ingest(await persistPayload(services, input));
+    let result;
+    try {
+      result = await services.repository.ingest(await persistPayload(services, input));
+    } catch (error) {
+      // Re-importing a session that grew can render a record it already
+      // stored slightly differently (a peer pairing only visible once more
+      // lanes exist). Keep the stored copy and report it, rather than failing
+      // the import halfway through.
+      if (error instanceof IntegrityConflictError) {
+        duplicates += 1;
+        warnings += 1;
+        return;
+      }
+      throw error;
+    }
     if (result.duplicate) duplicates += 1;
     else inserted += 1;
     warnings += result.warnings.length;
@@ -788,6 +802,9 @@ export async function registerTraceRoutes(
     async (request) => {
       const { traceId } = TraceParamsSchema.parse(request.params);
       const query = EventQuerySchema.parse(request.query);
+      // Read the stream position first: anything committed while the
+      // snapshot is assembled is then streamed again rather than missed.
+      const { latest: streamCursor } = await services.repository.getStreamBounds(traceId);
       const [trace, raw, agents, graph, topologyData] = await Promise.all([
         services.repository.getTrace(traceId),
         services.repository.listRawEvents(traceId, query.after, query.limit),
@@ -804,6 +821,7 @@ export async function registerTraceRoutes(
           declared: aggregateTopologyCapabilities(topologyData.sources),
           observed: topologyData.observed,
         },
+        streamCursor: String(streamCursor ?? 0n),
       };
     },
   );
@@ -920,8 +938,11 @@ export async function registerTraceRoutes(
     async (request, reply) => {
       const { traceId } = TraceParamsSchema.parse(request.params);
       const query = StreamQuerySchema.parse(request.query);
+      // A reconnecting EventSource sends Last-Event-ID but keeps the URL it was
+      // opened with, so the header is the newer position and wins.
       const header = request.headers["last-event-id"];
-      let cursor = BigInt(query.cursor ?? (typeof header === "string" ? header : "0"));
+      const resumeFrom = typeof header === "string" && /^[0-9]+$/u.test(header) ? header : null;
+      let cursor = BigInt(resumeFrom ?? query.cursor ?? "0");
       reply.hijack();
       reply.raw.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",

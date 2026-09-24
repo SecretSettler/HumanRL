@@ -109,3 +109,22 @@ describe("workbench store appendEvents", () => {
     expect(agents.some((lane) => lane.agentId === "gamma")).toBe(true);
   });
 });
+
+describe("applyPendingChunks", () => {
+  it("adds a batch in one update and drops chunks a revision already covers", () => {
+    useWorkbenchStore.getState().reset();
+    let updates = 0;
+    const unsubscribe = useWorkbenchStore.subscribe(() => (updates += 1));
+    const added = new Map(
+      Array.from({ length: 300 }, (_, index) => [`job-${index}`, String(index + 1)]),
+    );
+    useWorkbenchStore.getState().applyPendingChunks(added, 250);
+    expect(updates).toBe(1);
+    expect(Object.keys(useWorkbenchStore.getState().pendingChunks)).toHaveLength(50);
+    useWorkbenchStore.getState().applyPendingChunks(new Map(), 250);
+    expect(updates).toBe(1);
+    useWorkbenchStore.getState().applyPendingChunks(new Map(), 300);
+    expect(useWorkbenchStore.getState().pendingChunks).toEqual({});
+    unsubscribe();
+  });
+});

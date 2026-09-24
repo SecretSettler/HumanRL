@@ -359,6 +359,17 @@ export class ClaudeSessionAdapter implements TraceAdapter {
         contentType: display.contentType,
         ...(display.toolName ? { toolName: display.toolName } : {}),
       };
+      if (object.type === "user") {
+        // Claude Code marks what the person typed (`origin.kind: "human"`,
+        // `promptSource: "typed"`) and what it injected (`isMeta` for skill
+        // bodies and command caveats, `isCompactSummary` after compaction).
+        const originKind = stringValue(objectRecord(object.origin)?.kind);
+        const promptSource = stringValue(object.promptSource);
+        if (originKind) attributes.promptOrigin = originKind;
+        if (promptSource) attributes.promptSource = promptSource;
+        if (object.isMeta === true) attributes.isMeta = true;
+        if (object.isCompactSummary === true) attributes.isCompactSummary = true;
+      }
       const message = objectRecord(object.message);
       const content = message?.content;
       const blocks = Array.isArray(content)

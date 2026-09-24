@@ -41,7 +41,12 @@ interface WorkbenchState {
   setProviderCalls: (calls: ProviderCallAudit[] | null) => void;
   appendEvents: (events: readonly RawTraceEvent[]) => void;
   patchTrace: (patch: Partial<TraceSnapshot["trace"]>) => void;
-  addPendingChunk: (jobId: string, eventWatermark: string) => void;
+  /**
+   * Apply a batch of pending summarizer chunks: add `added` (jobId → event
+   * watermark), then drop every chunk a committed revision already covers
+   * (watermark ≤ `resolvedThrough`). One store update per batch.
+   */
+  applyPendingChunks: (added: ReadonlyMap<string, string>, resolvedThrough: number) => void;
   clearPendingChunks: () => void;
   setRawOnlyReason: (reason: string | null) => void;
   setMode: (mode: "live" | "final") => void;
@@ -140,8 +145,17 @@ export const useWorkbenchStore = create<WorkbenchState>((set) => ({
         ? { snapshot: { ...state.snapshot, trace: { ...state.snapshot.trace, ...patch } } }
         : state,
     ),
-  addPendingChunk: (jobId, eventWatermark) =>
-    set((state) => ({ pendingChunks: { ...state.pendingChunks, [jobId]: { eventWatermark } } })),
+  applyPendingChunks: (added, resolvedThrough) =>
+    set((state) => {
+      const next: Record<string, { eventWatermark: string }> = { ...state.pendingChunks };
+      for (const [jobId, eventWatermark] of added) next[jobId] = { eventWatermark };
+      for (const [jobId, chunk] of Object.entries(next))
+        if (Number(chunk.eventWatermark) <= resolvedThrough) delete next[jobId];
+      const before = Object.keys(state.pendingChunks);
+      const unchanged =
+        before.length === Object.keys(next).length && before.every((jobId) => jobId in next);
+      return unchanged ? state : { pendingChunks: next };
+    }),
   clearPendingChunks: () => set({ pendingChunks: {} }),
   setRawOnlyReason: (rawOnlyReason) => set({ rawOnlyReason }),
   setMode: (mode) => set({ mode }),

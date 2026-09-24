@@ -10,6 +10,7 @@ import {
   storyTotals,
   summarizeAction,
   traceStartMs,
+  userPrompts,
 } from "./execution-story";
 import { StoryEvents } from "./story-test-events";
 
@@ -46,6 +47,26 @@ describe("harness messages and Codex exec scripts", () => {
     s.push("user_message", "User · # AGENTS.md instructions for ~ <INSTRUCTIONS>", "codex");
     const real = s.push("user_message", "User · 给你一个空Repo，搭一个 trace 可视化", "codex");
     expect(firstUserPrompt(s.events)?.id).toBe(real.id);
+  });
+
+  it("trusts Claude's origin fields and skips interruption markers", () => {
+    expect(isHarnessMessage("[Request interrupted by user for tool use]")).toBe(true);
+    expect(isHarnessMessage("This session is being continued from a previous conversation")).toBe(
+      true,
+    );
+
+    const s = new StoryEvents();
+    s.push("user_message", "User · [Request interrupted by user]", "claude");
+    s.push("user_message", "User · Base directory for this skill: ~/skills/x", "claude", {
+      attributes: { isMeta: true },
+    });
+    s.push("user_message", "User · Sent by a hook", "claude", {
+      attributes: { promptOrigin: "hook" },
+    });
+    const typed = s.push("user_message", "User · <b>bold</b> is what I meant", "claude", {
+      attributes: { promptOrigin: "human", promptSource: "typed" },
+    });
+    expect(userPrompts(s.events).map((event) => event.id)).toEqual([typed.id]);
   });
 
   it("shows the commands inside a Codex exec script instead of the script", () => {

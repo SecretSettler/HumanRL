@@ -13,20 +13,21 @@ import {
 } from "@/lib/workbench/execution-story";
 import { formatDurationMs } from "@/lib/workbench/format";
 import {
-  evaluatePromptOptimization,
+  accountSpawns,
   type SpawnAccounting,
   type SpawnVerdict,
-} from "@/lib/workbench/prompt-optimizer";
-import { reviewPrompt, type PromptFinding } from "@/lib/workbench/prompt-review";
+} from "@/lib/workbench/spawn-accounting";
+import { reviewTurns, type PromptFinding } from "@/lib/workbench/prompt-review";
+import { splitTurns } from "@/lib/workbench/prompt-turns";
 import { useWorkbenchStore } from "@/lib/workbench/store";
 import { artifactUrl } from "@/lib/workbench/trace-api";
 import type { RawTraceEvent } from "@/lib/workbench/types";
 
 const VERDICT_LABEL: Record<SpawnVerdict, string> = {
-  worth: "Paid off",
-  marginal: "Marginal",
-  wasteful: "Wasted",
-  pending: "Pending",
+  worth: "Worth it",
+  marginal: "Barely worth it",
+  wasteful: "Not worth it",
+  pending: "Not started",
 };
 
 const STATUS_GLYPH = { completed: "✓", failed: "!", running: "•" } as const;
@@ -165,7 +166,7 @@ function StepRow({
             <span className="mt-0.5 block truncate text-micro text-muted-2">
               {step.label} · {step.childAgentIds.join(", ")}
               {spawnAccount && spawnAccount.childrenStarted > 0
-                ? ` · children absorbed ${spawnAccount.childToolResults} results / ${spawnAccount.childModelCalls} turns`
+                ? ` · subagents made ${spawnAccount.childToolCalls} tool calls`
                 : ""}
             </span>
           </span>
@@ -233,7 +234,7 @@ function SpawnCard({
   color: string;
   onSelect: (eventId: string) => void;
 }) {
-  const sign = spawn.netTokens >= 0 ? "+" : "−";
+  const count = spawn.childAgentIds.length;
   return (
     <button type="button" className="spawn-card" onClick={() => onSelect(spawn.handoffEventId)}>
       <span className="flex items-center justify-between gap-2">
@@ -244,25 +245,22 @@ function SpawnCard({
       </span>
       <span className="mt-1 block truncate text-meta text-ink">{spawn.label}</span>
       <span className="mt-1 block text-micro text-muted-2">
-        {spawn.childAgentIds.length} child agents, {spawn.childrenJoined}/{spawn.childrenStarted}{" "}
-        joined
+        {count} subagent{count === 1 ? "" : "s"} · {spawn.childrenJoined}/{spawn.childrenStarted}{" "}
+        finished
         {spawn.childFailures > 0 ? ` · ${spawn.childFailures} failed` : ""}
       </span>
       <span className="mt-1.5 grid grid-cols-3 gap-1 text-micro">
         <span className="spawn-figure">
-          <span>absorbed</span>
-          <strong>≥{spawn.absorbedTokens}</strong>
+          <span>their tool calls</span>
+          <strong>{spawn.childToolCalls}</strong>
         </span>
         <span className="spawn-figure">
-          <span>cost</span>
-          <strong>≥{spawn.spawnCostTokens}</strong>
+          <span>kept out of main</span>
+          <strong>≥{spawn.absorbedTokens} tok</strong>
         </span>
         <span className="spawn-figure">
-          <span>net</span>
-          <strong className={spawn.netTokens >= 0 ? "text-green" : "text-red"}>
-            {sign}
-            {Math.abs(spawn.netTokens)}
-          </strong>
+          <span>cost to start</span>
+          <strong>≥{spawn.spawnCostTokens} tok</strong>
         </span>
       </span>
     </button>
@@ -373,17 +371,39 @@ export function ExecutionStoryPanel() {
   );
   const steps = useMemo(() => buildExecutionStory(events), [events]);
   const totals = useMemo(() => storyTotals(steps), [steps]);
-  const decision = useMemo(() => evaluatePromptOptimization({ events }), [events]);
-  const review = useMemo(
-    () => reviewPrompt({ events, optimization: decision }),
-    [decision, events],
-  );
-  const promptText = usePromptText(snapshot?.trace.id ?? null, review.promptEvent);
+  const spawns = useMemo(() => accountSpawns(events), [events]);
+  const reviews = useMemo(() => reviewTurns(events), [events]);
+  // null follows the latest prompt as the playhead moves; a number pins a turn.
+  const [pinnedTurn, setPinnedTurn] = useState<number | null>(null);
+  const traceId = snapshot?.trace.id ?? null;
+  useEffect(() => setPinnedTurn(null), [traceId]);
+  const latestTurn = Math.max(0, reviews.length - 1);
+  const turnIndex = pinnedTurn !== null && pinnedTurn < reviews.length ? pinnedTurn : latestTurn;
+  const review = reviews[turnIndex] ?? {
+    turnIndex: 0,
+    promptEvent: null,
+    promptPreview: "",
+    promptTokens: 0,
+    findings: [],
+  };
+  const showTurn = (index: number) => setPinnedTurn(index >= latestTurn ? null : index);
+  const turnOfEvent = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const turn of splitTurns(events))
+      for (const event of turn.events) map.set(event.id, turn.index);
+    return map;
+  }, [events]);
+  const promptText = usePromptText(traceId, review.promptEvent);
   const [promptOpen, setPromptOpen] = useState(false);
   const spawnByEvent = useMemo(
-    () => new Map(decision.spawns.map((spawn) => [spawn.handoffEventId, spawn] as const)),
-    [decision.spawns],
+    () => new Map(spawns.map((spawn) => [spawn.handoffEventId, spawn] as const)),
+    [spawns],
   );
+  // The ledger follows the prompt picked in the review, like its findings.
+  const turnSpawns =
+    reviews.length > 1
+      ? spawns.filter((spawn) => turnOfEvent.get(spawn.handoffEventId) === turnIndex)
+      : spawns;
   const laneOrder = useMemo(
     () =>
       laneOrderFor(
@@ -464,7 +484,11 @@ export function ExecutionStoryPanel() {
                     Prompt review
                   </p>
                   <h3 className="m-0 mt-0.5 text-meta font-semibold text-ink">
-                    What your prompt caused in this run
+                    {reviews.length > 1
+                      ? turnIndex === 0
+                        ? "What your opening prompt caused"
+                        : "What this follow-up caused"
+                      : "What your prompt caused in this run"}
                   </h3>
                 </div>
                 {review.promptEvent ? (
@@ -473,6 +497,38 @@ export function ExecutionStoryPanel() {
                   </span>
                 ) : null}
               </div>
+              {reviews.length > 1 ? (
+                <nav className="turn-nav" aria-label="Prompt turns">
+                  <button
+                    type="button"
+                    aria-label="Previous prompt"
+                    disabled={turnIndex === 0}
+                    onClick={() => showTurn(turnIndex - 1)}
+                  >
+                    ‹
+                  </button>
+                  <span>
+                    Prompt {turnIndex + 1} of {reviews.length}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Next prompt"
+                    disabled={turnIndex === latestTurn}
+                    onClick={() => showTurn(turnIndex + 1)}
+                  >
+                    ›
+                  </button>
+                  {pinnedTurn !== null ? (
+                    <button
+                      type="button"
+                      className="turn-nav__latest"
+                      onClick={() => showTurn(latestTurn)}
+                    >
+                      Latest
+                    </button>
+                  ) : null}
+                </nav>
+              ) : null}
               {review.promptEvent ? (
                 <button
                   type="button"
@@ -498,64 +554,20 @@ export function ExecutionStoryPanel() {
                   ))}
                 </ul>
               ) : review.promptEvent ? (
-                <p className="m-0 mt-2 text-meta text-muted-2">
-                  Nothing to flag yet; findings appear as the run produces failures, spawns or
-                  repeated work.
-                </p>
+                <p className="m-0 mt-2 text-meta text-muted-2">Nothing to flag for this prompt.</p>
               ) : null}
             </div>
 
-            <div className="rounded-lg border border-line bg-[#0d1118] p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="m-0 text-micro font-bold uppercase tracking-[0.14em] text-muted-2">
-                    Prompt optimizer
-                  </p>
-                  <h3 className="m-0 mt-0.5 text-meta font-semibold text-ink">
-                    Should the root agent spawn now?
-                  </h3>
-                </div>
-                <span className={`prompt-decision prompt-decision--${decision.decision}`}>
-                  {decision.decision === "spawn" ? "Spawn now" : "Hold"}
-                </span>
-              </div>
-              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
-                <div className="metric-card">
-                  <span>root turns</span>
-                  <strong>{decision.contextPressure}</strong>
-                </div>
-                <div className="metric-card">
-                  <span>failed / repeated</span>
-                  <strong>
-                    {decision.toolFailures} / {decision.repeatedToolCalls}
-                  </strong>
-                </div>
-                <div className="metric-card">
-                  <span>expected saving</span>
-                  <strong>≥{decision.expectedSavedTokens} tok</strong>
-                </div>
-                <div className="metric-card">
-                  <span>one spawn costs</span>
-                  <strong>≥{decision.spawnCostTokens} tok</strong>
-                </div>
-              </div>
-              <ul className="m-0 mt-2.5 grid gap-1 pl-4 text-meta text-muted">
-                {decision.reasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-              <p className="m-0 mt-2.5 text-micro text-muted-2">
-                Event metadata only; the prompt body is never read. Token figures are floors
-                estimated from names and event counts, for comparison, not billing.
-              </p>
-            </div>
-
-            {decision.spawns.length > 0 ? (
+            {turnSpawns.length > 0 ? (
               <div className="grid gap-1.5">
                 <p className="m-0 text-micro font-bold uppercase tracking-[0.14em] text-muted-2">
-                  Spawn ledger · did each wave pay off?
+                  {reviews.length > 1 ? "Subagents started for this prompt" : "Subagents started"}
                 </p>
-                {decision.spawns.map((spawn) => (
+                <p className="m-0 text-micro text-muted-2">
+                  Worth it when the subagents kept more out of the main agent&apos;s context than
+                  they cost to start. Token figures are rough lower bounds.
+                </p>
+                {turnSpawns.map((spawn) => (
                   <SpawnCard
                     key={spawn.handoffEventId}
                     spawn={spawn}

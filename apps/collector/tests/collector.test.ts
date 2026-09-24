@@ -642,6 +642,37 @@ describe("collector path boundary", () => {
     expect(outputs.some((line) => line.includes('"rotated":true'))).toBe(true);
   });
 
+  it("keeps following when the API already holds a record with different content", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "intenttrace-collector-"));
+    temporaryDirectories.push(directory);
+    const path = join(directory, "session.jsonl");
+    await writeFile(
+      path,
+      '{"type":"session_meta","version":"codex-jsonl-v1","timestamp":"2026-08-01T00:00:00.000Z","payload":{"id":"session-1","agent_id":"orchestrator"}}\n',
+    );
+    const receiver = mockFetch();
+    let calls = 0;
+    const conflictOnce = async (input: string | URL | Request, init?: RequestInit) => {
+      calls += 1;
+      if (calls === 1)
+        return new Response(JSON.stringify({ code: "integrity_conflict" }), {
+          status: 409,
+          headers: { "content-type": "application/problem+json" },
+        });
+      return receiver(input, init);
+    };
+    const outputs: string[] = [];
+    await expect(
+      runCollector(["follow", "--source", "codex", "--path", path, "--once"], {
+        fetch: conflictOnce as typeof fetch,
+        output: (line) => outputs.push(line),
+        environment: { INTENTTRACE_COLLECTOR_STATE: join(directory, "state") },
+      }),
+    ).resolves.toBe(0);
+    expect(calls).toBe(1);
+    expect(outputs.some((line) => line.includes('"duplicates":1'))).toBe(true);
+  });
+
   it("groups Claude root and sidecars into one collector candidate", async () => {
     const directory = await mkdtemp(join(tmpdir(), "intenttrace-collector-"));
     temporaryDirectories.push(directory);

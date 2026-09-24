@@ -343,6 +343,92 @@ describe("implemented trace adapters", () => {
     );
   });
 
+  it("keeps Claude's own record of which user messages the person typed", async () => {
+    const lines = [
+      {
+        type: "user",
+        version: "2.1.271",
+        uuid: "typed",
+        sessionId: "claude-origin",
+        timestamp: "2026-08-01T00:00:00.000Z",
+        origin: { kind: "human" },
+        promptSource: "typed",
+        message: { role: "user", content: "Explain the crash" },
+      },
+      {
+        type: "user",
+        version: "2.1.271",
+        uuid: "skill",
+        sessionId: "claude-origin",
+        timestamp: "2026-08-01T00:00:01.000Z",
+        isMeta: true,
+        message: { role: "user", content: "Base directory for this skill: ~/skills/x" },
+      },
+      {
+        type: "user",
+        version: "2.1.271",
+        uuid: "interrupt",
+        sessionId: "claude-origin",
+        timestamp: "2026-08-01T00:00:02.000Z",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "[Request interrupted by user for tool use]" }],
+        },
+      },
+    ];
+    const records = await parse(
+      new ClaudeSessionAdapter(),
+      new TextEncoder().encode(lines.map((line) => JSON.stringify(line)).join("\n")),
+    );
+    const attributes = new Map(
+      records.flatMap((record) =>
+        record.type === "event"
+          ? [[record.event.source.sourceEventId, record.event.attributes] as const]
+          : [],
+      ),
+    );
+    expect(attributes.get("typed")).toMatchObject({ promptOrigin: "human", promptSource: "typed" });
+    expect(attributes.get("skill")).toMatchObject({ isMeta: true });
+    expect(attributes.get("skill")).not.toHaveProperty("promptOrigin");
+    expect(attributes.get("interrupt")).not.toHaveProperty("promptOrigin");
+  });
+
+  it("gives a session's records the same identity when the grown file is imported again", async () => {
+    const line = (uuid: string, second: number, content: string) =>
+      JSON.stringify({
+        type: "user",
+        version: "2.1.271",
+        uuid,
+        sessionId: "claude-growing",
+        timestamp: `2026-08-01T00:00:0${second}.000Z`,
+        message: { role: "user", content },
+      });
+    const lines = [line("u1", 0, "Find the flaky test"), line("u2", 1, "Now fix it")];
+    // Import identities are content hashes, so they differ once the file grows.
+    const events = async (text: string, sourceIdentity: string) => {
+      const records: AdapterRecord[] = [];
+      for await (const record of new ClaudeSessionAdapter().parse({
+        parts: [{ path: "session.jsonl", bytes: new TextEncoder().encode(text) }],
+        sourceIdentity,
+      }))
+        records.push(record);
+      return new Map(
+        records.flatMap((record) =>
+          record.type === "event"
+            ? [[record.event.source.sourceEventId, record.event] as const]
+            : [],
+        ),
+      );
+    };
+    const before = await events(lines[0]!, "bundle-before");
+    const after = await events(lines.join("\n"), "bundle-after");
+    expect(after.get("u1")).toEqual(before.get("u1"));
+    expect(after.get("u1")?.source.sourceInstanceId).toMatch(/^session-/u);
+    expect(after.get("u2")?.source.sourceInstanceId).toBe(
+      before.get("u1")?.source.sourceInstanceId,
+    );
+  });
+
   it("maps OpenCode SQLite topology, both join envelopes, and recovered overflow", async () => {
     const parts = [
       { path: "opencode.db", bytes: await fixture("opencode", "topology/opencode.db") },
