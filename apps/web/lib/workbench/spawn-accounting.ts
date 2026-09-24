@@ -1,25 +1,13 @@
-import {
-  TOOL_CALL_KINDS,
-  firstUserPrompt,
-  isHarnessMessage,
-  splitName,
-  toolNameOf,
-} from "./execution-story";
+import { TOOL_CALL_KINDS, firstUserPrompt, isHarnessMessage, splitName } from "./execution-story";
 import type { RawTraceEvent } from "./types";
 
 /**
- * Prompt optimizer: when is a subagent worth its context cost?
+ * Spawn accounting: did each batch of subagents pay for itself?
  *
- * Two questions, answered from event metadata only:
- *
- * 1. For every spawn that already happened, was it worth it? A child lane
- *    absorbs its own tool results and model turns; none of that lands in the
- *    parent's context. That absorbed volume is the saving; the child's fresh
- *    context (system prompt share + task assignment) is the cost.
- * 2. At the current watermark, should the root agent spawn now? Only signals
- *    visible without the prompt body are used: tool failures and repeated
- *    calls (evidence gaps worth isolating) and context pressure (how many
- *    model turns the root lane has already accumulated).
+ * A child lane absorbs its own tool results and model turns; none of that
+ * lands in the parent's context. That absorbed volume is the saving; the
+ * child's fresh context (system prompt share + task assignment) is the cost.
+ * Only event metadata is used.
  *
  * Token figures are estimates. Names are capped at 240 characters and result
  * bodies are withheld, so every number is a floor, labelled as such in the UI.
@@ -30,13 +18,7 @@ const TOKENS_PER_ABSORBED_TOOL_RESULT = 180;
 const TOKENS_PER_ABSORBED_MODEL_TURN = 90;
 /** Fixed context a fresh child pays before doing anything useful. */
 const CHILD_FIXED_OVERHEAD_TOKENS = 240;
-/** Prospective savings per signal when recommending a spawn at the watermark. */
-const TOKENS_SAVED_PER_FAILURE = 120;
-const TOKENS_SAVED_PER_REPEAT = 80;
-const TOKENS_SAVED_PER_PRESSURE_TURN = 150;
-const CONTEXT_PRESSURE_FREE_TURNS = 6;
 
-export type PromptOptimizationDecision = "spawn" | "hold";
 export type SpawnVerdict = "worth" | "marginal" | "wasteful" | "pending";
 
 export interface SpawnAccounting {
@@ -57,23 +39,6 @@ export interface SpawnAccounting {
   absorbedTokens: number;
   netTokens: number;
   verdict: SpawnVerdict;
-}
-
-export interface PromptOptimizationResult {
-  decision: PromptOptimizationDecision;
-  traceComplete: boolean;
-  score: number;
-  promptTokens: number;
-  rootAgentId: string | null;
-  independentTasks: number;
-  toolFailures: number;
-  repeatedToolCalls: number;
-  contextPressure: number;
-  activeChildren: number;
-  spawnCostTokens: number;
-  expectedSavedTokens: number;
-  reasons: string[];
-  spawns: SpawnAccounting[];
 }
 
 function seqOf(event: RawTraceEvent): number {
@@ -233,111 +198,4 @@ export function accountSpawns(events: readonly RawTraceEvent[]): SpawnAccounting
         verdict,
       };
     });
-}
-
-export function evaluatePromptOptimization({
-  events,
-}: {
-  events: readonly RawTraceEvent[];
-}): PromptOptimizationResult {
-  const ordered = [...events].sort((a, b) => seqOf(a) - seqOf(b));
-  const rootAgentId = rootAgentOf(ordered);
-  const rootLane = rootAgentId
-    ? ordered.filter((event) => event.agentId === rootAgentId)
-    : ordered.filter((event) => !event.agentId);
-
-  const firstPrompt = firstUserPrompt(ordered);
-  const promptTokens = firstPrompt ? promptTokensOf(firstPrompt) : 0;
-
-  const spawns = accountSpawns(ordered);
-  const spawnedIds = new Set(spawns.flatMap((spawn) => spawn.childAgentIds));
-  for (const event of ordered)
-    if (event.kind === "agent_start" && event.agentId && stringAttr(event, "parentAgentId"))
-      spawnedIds.add(event.agentId);
-  const independentTasks = spawnedIds.size;
-
-  const started = new Set<string>();
-  const ended = new Set<string>();
-  for (const event of ordered) {
-    if (!event.agentId || !spawnedIds.has(event.agentId)) continue;
-    if (event.kind === "agent_start") started.add(event.agentId);
-    if (event.kind === "agent_end") ended.add(event.agentId);
-  }
-  const activeChildren = [...started].filter((id) => !ended.has(id)).length;
-
-  const rootCalls = rootLane.filter((event) => TOOL_CALL_KINDS.has(event.kind));
-  const toolFailures = rootLane.filter(
-    (event) =>
-      (TOOL_CALL_KINDS.has(event.kind) && event.status === "error") || isFailedResult(event),
-  ).length;
-  const rootCallNames = rootCalls.map((event) => `${toolNameOf(event)}\u0000${event.name}`);
-  const repeatedToolCalls = rootCallNames.length - new Set(rootCallNames).size;
-  const contextPressure = modelTurns(rootLane);
-
-  const spawnCostTokens = CHILD_FIXED_OVERHEAD_TOKENS + Math.ceil(promptTokens * 0.5);
-  const expectedSavedTokens =
-    toolFailures * TOKENS_SAVED_PER_FAILURE +
-    repeatedToolCalls * TOKENS_SAVED_PER_REPEAT +
-    Math.max(0, contextPressure - CONTEXT_PRESSURE_FREE_TURNS) * TOKENS_SAVED_PER_PRESSURE_TURN;
-
-  const score = Math.min(
-    100,
-    toolFailures * 14 +
-      repeatedToolCalls * 8 +
-      Math.max(0, contextPressure - CONTEXT_PRESSURE_FREE_TURNS) * 6 +
-      (promptTokens > 0 && promptTokens < 40 ? 10 : 0),
-  );
-
-  const traceComplete = ordered.some((event) => event.kind === "trace_complete");
-
-  const reasons: string[] = [];
-  if (traceComplete)
-    reasons.push(
-      "Trace is complete, so there is no dispatch left; the ledger below is a post-mortem of this run",
-    );
-  if (activeChildren > 0)
-    reasons.push(
-      `${activeChildren} child agent${activeChildren === 1 ? " is" : "s are"} still running; wait for the join instead of spawning again`,
-    );
-  if (toolFailures > 0)
-    reasons.push(
-      `Root agent has ${toolFailures} failed tool call${toolFailures === 1 ? "" : "s"}; worth isolating that investigation in a child`,
-    );
-  if (repeatedToolCalls > 0)
-    reasons.push(
-      `Root agent repeated the same tool action ${repeatedToolCalls} time${repeatedToolCalls === 1 ? "" : "s"}`,
-    );
-  if (contextPressure > CONTEXT_PRESSURE_FREE_TURNS)
-    reasons.push(
-      `Root agent has taken ${contextPressure} model turns; its context is getting heavy`,
-    );
-  const decision: PromptOptimizationDecision =
-    !traceComplete && activeChildren === 0 && expectedSavedTokens >= spawnCostTokens
-      ? "spawn"
-      : "hold";
-  if (decision === "spawn" && promptTokens > 0 && promptTokens < 40)
-    reasons.push(
-      `Prompt is only ~${promptTokens} tokens; write the sub-task boundary before dispatching`,
-    );
-  if (reasons.length === 0)
-    reasons.push(
-      "No failure, repetition or context-pressure signal on the root lane; keep going with the current agent",
-    );
-
-  return {
-    decision,
-    traceComplete,
-    score,
-    promptTokens,
-    rootAgentId,
-    independentTasks,
-    toolFailures,
-    repeatedToolCalls,
-    contextPressure,
-    activeChildren,
-    spawnCostTokens,
-    expectedSavedTokens,
-    reasons,
-    spawns,
-  };
 }
