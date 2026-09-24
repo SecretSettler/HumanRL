@@ -134,21 +134,35 @@ const KIND_FALLBACK: Record<string, string> = {
  * they are recognised by shape.
  */
 export function isHarnessMessage(text: string): boolean {
-  return /^\s*(?:<[a-z_]+[^>]*>|#\s*AGENTS\.md|<INSTRUCTIONS>)/iu.test(text);
+  return (
+    /^\s*(?:<[a-z_]+[^>]*>|#\s*AGENTS\.md|<INSTRUCTIONS>)/iu.test(text) ||
+    // Claude Code's marker after Esc; the person's next message is the prompt.
+    /^\s*\[Request interrupted by user/u.test(text) ||
+    /^\s*This session is being continued from a previous conversation/u.test(text)
+  );
 }
 
-/** The author's prompt: the first user message that is neither a task assignment nor harness-injected. */
+/**
+ * Whether a user message is something the author typed. Claude Code records
+ * this directly (`promptOrigin`, `isMeta`, `isCompactSummary` from the
+ * adapter); older transcripts and Codex fall back to the shape of the text.
+ */
+export function isAuthorPrompt(event: RawTraceEvent): boolean {
+  if (event.kind !== "user_message" || stringAttr(event, "assignedBy")) return false;
+  if (event.attributes.isMeta === true || event.attributes.isCompactSummary === true) return false;
+  const origin = stringAttr(event, "promptOrigin");
+  if (origin) return origin === "human";
+  return !isHarnessMessage(splitName(event.name).detail ?? event.name);
+}
+
+/** Messages the author typed, oldest first. */
+export function userPrompts(events: readonly RawTraceEvent[]): RawTraceEvent[] {
+  return [...events].sort((a, b) => seqOf(a) - seqOf(b)).filter(isAuthorPrompt);
+}
+
+/** The author's opening prompt. */
 export function firstUserPrompt(events: readonly RawTraceEvent[]): RawTraceEvent | null {
-  return (
-    [...events]
-      .sort((a, b) => seqOf(a) - seqOf(b))
-      .find(
-        (event) =>
-          event.kind === "user_message" &&
-          !stringAttr(event, "assignedBy") &&
-          !isHarnessMessage(splitName(event.name).detail ?? event.name),
-      ) ?? null
-  );
+  return userPrompts(events)[0] ?? null;
 }
 
 /**

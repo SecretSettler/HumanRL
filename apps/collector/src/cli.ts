@@ -279,6 +279,13 @@ async function ingestPreparedSession(
     } catch {
       throw new Error("API request failed");
     }
+    // 409: the record is already stored with different derived content (see
+    // persistPreparedBundle in the API); keep the stored copy and warn.
+    if (response.status === 409) {
+      duplicates += 1;
+      ingestWarnings += 1;
+      return;
+    }
     if (!response.ok) {
       throw new Error(`API rejected event (${response.status})`);
     }

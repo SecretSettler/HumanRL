@@ -333,7 +333,21 @@ async function persistPreparedBundle(
   let duplicates = 0;
   let warnings = prepared.warnings.length;
   const send = async (input: z.infer<typeof RawTraceEventInputSchema>) => {
-    const result = await services.repository.ingest(await persistPayload(services, input));
+    let result;
+    try {
+      result = await services.repository.ingest(await persistPayload(services, input));
+    } catch (error) {
+      // Re-importing a session that grew can render a record it already
+      // stored slightly differently (a peer pairing only visible once more
+      // lanes exist). Keep the stored copy and report it, rather than failing
+      // the import halfway through.
+      if (error instanceof IntegrityConflictError) {
+        duplicates += 1;
+        warnings += 1;
+        return;
+      }
+      throw error;
+    }
     if (result.duplicate) duplicates += 1;
     else inserted += 1;
     warnings += result.warnings.length;
