@@ -10,6 +10,6 @@
     "typecheck": "node scripts/check.mjs"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "2.11.4"
+    "@tauri-apps/cli": "2.11.5"
   }
 }
