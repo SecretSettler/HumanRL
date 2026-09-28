@@ -14,7 +14,7 @@ tauri-build = "=2.6.3"
 flate2 = "=1.1.10"
 serde = { version = "=1.0.229", features = ["derive"] }
 tar = "=0.4.46"
-tauri = "=2.11.5"
+tauri = "=2.11.6"
 
 [profile.release]
 codegen-units = 1
