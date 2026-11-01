@@ -1,4 +1,4 @@
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS build
+FROM node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS build
 
 # Both build tools ship telemetry enabled by default. `pnpm build` is
 # `turbo run build`, so the build stage would report to Vercel without this.
@@ -21,7 +21,7 @@ RUN pnpm deploy --legacy --prod --filter @intenttrace/db /out/migrate \
  && pnpm deploy --legacy --prod --filter @intenttrace/api /out/api \
  && pnpm deploy --legacy --prod --filter @intenttrace/worker /out/worker
 
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+FROM node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
